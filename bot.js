@@ -20,8 +20,9 @@ async function fetchReutersNews(category = 'markets') {
 }
 
 async function askGemini(question, newsContext = '') {
-  const prompt = `You are a friendly financial and geopolitical news analyst.
-Answer in plain simple English that anyone can understand.
+  const prompt = `You are a witty, friendly financial and geopolitical news analyst built by the almighty Min.
+You explain complex news in plain simple English that anyone can understand.
+Keep answers concise, clear and occasionally add a light humorous remark.
 
 ${newsContext ? `Latest Reuters news:\n${newsContext}\n\n` : ''}
 
@@ -41,114 +42,128 @@ Question: ${question}`;
 }
 
 function formatNews(articles, category) {
-  const header = `📰 *Reuters ${category.toUpperCase()} News*\n\n`;
+  const emojis = { markets: '📈', world: '🌍', technology: '💻' };
+  const header = `${emojis[category] || '📰'} *Reuters ${category.toUpperCase()} News*\n\n`;
   const body = articles.map((a, i) =>
     `*${i + 1}. ${a.title}*\n${a.contentSnippet || ''}\n[Read more](${a.link})`
   ).join('\n\n');
   return header + body;
 }
 
+// Start command
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
-    `👋 Wah lau eh welcome to *Wah Lau News Bot!* 🤣\n\n` +
+    `👋 Hey welcome to *Reuters GPT Bot!*\n\n` +
+    `Built by the almighty Min 🙏⚡\n\n` +
+    `Your personal AI news analyst — straight from Reuters, explained like a friend 📰🤖\n\n` +
     `Here is what I can do:\n\n` +
-    `📈 /markets — Latest market news\n` +
+    `📈 /markets — Latest market and stocks news\n` +
     `🌍 /world — World and geopolitics news\n` +
     `💻 /tech — Technology news\n` +
-    `☀️ /briefing — Your daily news summary\n` +
+    `☀️ /briefing — Your daily AI news summary\n` +
     `🤖 /ask [question] — Ask me anything\n\n` +
-    `Or just type any question and I will answer lah!`,
+    `Or just type any question naturally and I will handle the rest! 😎`,
     { parse_mode: 'Markdown' }
   );
 });
 
+// Markets
 bot.onText(/\/markets/, async (msg) => {
-  bot.sendMessage(msg.chat.id, '⏳ Fetching latest Reuters markets news...');
+  bot.sendMessage(msg.chat.id, '📈 Pulling the latest market news from Reuters...');
   try {
     const articles = await fetchReutersNews('markets');
     bot.sendMessage(msg.chat.id, formatNews(articles, 'markets'), { parse_mode: 'Markdown' });
   } catch (err) {
-    bot.sendMessage(msg.chat.id, '❌ Cannot fetch news. Try again later.');
+    bot.sendMessage(msg.chat.id, '😬 Could not fetch markets news right now. Try again in a bit!');
   }
 });
 
+// World
 bot.onText(/\/world/, async (msg) => {
-  bot.sendMessage(msg.chat.id, '⏳ Fetching latest Reuters world news...');
+  bot.sendMessage(msg.chat.id, '🌍 Fetching the latest world and geopolitics news...');
   try {
     const articles = await fetchReutersNews('world');
     bot.sendMessage(msg.chat.id, formatNews(articles, 'world'), { parse_mode: 'Markdown' });
   } catch (err) {
-    bot.sendMessage(msg.chat.id, '❌ Cannot fetch news. Try again later.');
+    bot.sendMessage(msg.chat.id, '😬 Could not fetch world news right now. Try again in a bit!');
   }
 });
 
+// Tech
 bot.onText(/\/tech/, async (msg) => {
-  bot.sendMessage(msg.chat.id, '⏳ Fetching latest Reuters tech news...');
+  bot.sendMessage(msg.chat.id, '💻 Getting the latest tech news...');
   try {
     const articles = await fetchReutersNews('technology');
     bot.sendMessage(msg.chat.id, formatNews(articles, 'technology'), { parse_mode: 'Markdown' });
   } catch (err) {
-    bot.sendMessage(msg.chat.id, '❌ Cannot fetch news. Try again later.');
+    bot.sendMessage(msg.chat.id, '😬 Could not fetch tech news right now. Try again in a bit!');
   }
 });
 
+// Briefing
 bot.onText(/\/briefing/, async (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, '☀️ Generating your news briefing...');
+  bot.sendMessage(chatId, '☀️ Hang tight — putting together your briefing...');
   try {
     const markets = await fetchReutersNews('markets');
     const world = await fetchReutersNews('world');
     const allNews = [...markets, ...world].map(a => a.title).join('\n');
     const summary = await askGemini(
-      'Give me a short morning briefing based on these headlines. Keep it simple, friendly and easy to understand.',
+      'Give me a short news briefing based on these headlines. Keep it friendly, simple and easy to understand.',
       allNews
     );
-    bot.sendMessage(chatId, `☀️ *Your Daily Briefing*\n\n${summary}`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId,
+      `☀️ *Your Daily Briefing — by Reuters GPT Bot*\n\n${summary}\n\n_Powered by the almighty Min_ 🙏`,
+      { parse_mode: 'Markdown' }
+    );
   } catch (err) {
-    bot.sendMessage(chatId, '❌ Something went wrong. Try again.');
+    bot.sendMessage(chatId, '😬 Something went wrong with your briefing. Try again!');
   }
 });
 
+// Ask command
 bot.onText(/\/ask (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const question = match[1];
-  bot.sendMessage(chatId, '🤔 Let me check and answer that...');
+  bot.sendMessage(chatId, '🤔 Good question — let me check the latest news and get back to you...');
   try {
     const articles = await fetchReutersNews('markets');
     const newsContext = articles.map(a => a.title).join('\n');
     const answer = await askGemini(question, newsContext);
-    bot.sendMessage(chatId, `🤖 *Answer:*\n\n${answer}`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `🤖 *Here is what I found:*\n\n${answer}`, { parse_mode: 'Markdown' });
   } catch (err) {
-    bot.sendMessage(chatId, '❌ Something went wrong. Try again.');
+    bot.sendMessage(chatId, '😬 Something went wrong. Try asking again!');
   }
 });
 
+// Plain text questions
 bot.on('message', async (msg) => {
   if (msg.text && !msg.text.startsWith('/')) {
     const chatId = msg.chat.id;
-    bot.sendMessage(chatId, '🤔 Checking latest news and thinking...');
+    bot.sendMessage(chatId, '🤔 On it — checking the latest news for you...');
     try {
       const articles = await fetchReutersNews('markets');
       const newsContext = articles.map(a => a.title).join('\n');
       const answer = await askGemini(msg.text, newsContext);
-      bot.sendMessage(chatId, `🤖 *Answer:*\n\n${answer}`, { parse_mode: 'Markdown' });
+      bot.sendMessage(chatId, `🤖 *Here is what I found:*\n\n${answer}`, { parse_mode: 'Markdown' });
     } catch (err) {
-      bot.sendMessage(chatId, '❌ Something went wrong. Try again.');
+      bot.sendMessage(chatId, '😬 Something went wrong. Try again!');
     }
   }
 });
 
+// Morning briefing at 8am daily
 cron.schedule('0 8 * * *', async () => {
   try {
     const markets = await fetchReutersNews('markets');
     const world = await fetchReutersNews('world');
     const allNews = [...markets, ...world].map(a => a.title).join('\n');
     const summary = await askGemini(
-      'Give me a short morning briefing. Keep it simple, friendly and easy to understand.',
+      'Give me a short friendly morning briefing. Simple, clear and easy to understand.',
       allNews
     );
     bot.sendMessage(CHAT_ID,
-      `☀️ *Good Morning! Wah Lau News Briefing*\n\n${summary}`,
+      `☀️ *Good Morning! Your Daily Reuters Briefing is here*\n\n${summary}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
       { parse_mode: 'Markdown' }
     );
   } catch (err) {
@@ -156,4 +171,4 @@ cron.schedule('0 8 * * *', async () => {
   }
 });
 
-console.log('✅ Wah Lau News Bot is running...');
+console.log('✅ Reuters GPT Bot is running — built by the almighty Min 🙏');
