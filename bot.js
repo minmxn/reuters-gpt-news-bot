@@ -1,4 +1,4 @@
-frequire('dotenv').config();
+require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const cron = require('node-cron');
@@ -42,7 +42,7 @@ async function fetchNewsByCountry(country, pageSize = 5) {
 // ─── GROQ AI ──────────────────────────────────────────────────────
 
 async function askGroq(question, newsContext = '') {
-  const prompt = `You are a witty, friendly financial and geopolitical news analyst built by the almighty Min.
+  const prompt = `You are a witty, friendly financial and geopolitical news analyst built by MIN.
 You explain complex news in plain simple English that anyone can understand.
 Keep answers concise, clear and occasionally add a light humorous remark.
 ${newsContext ? `\nLatest news context:\n${newsContext}\n` : ''}
@@ -69,22 +69,11 @@ function generateNewsPDF(articles, edition) {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Singapore'
     });
 
-    // Header background
     doc.rect(0, 0, doc.page.width, 120).fill('#1a1a2e');
-
-    // Title
-    doc.fillColor('#FFD700')
-      .fontSize(32)
-      .font('Helvetica-Bold')
+    doc.fillColor('#FFD700').fontSize(32).font('Helvetica-Bold')
       .text('NOMO NEWS', 50, 25, { align: 'center' });
-
-    // Edition and date
-    doc.fillColor('#ffffff')
-      .fontSize(14)
-      .font('Helvetica')
+    doc.fillColor('#ffffff').fontSize(14).font('Helvetica')
       .text(`${edition}  |  ${now}`, 50, 68, { align: 'center' });
-
-    // Divider line
     doc.moveTo(50, 130).lineTo(doc.page.width - 50, 130).strokeColor('#FFD700').lineWidth(2).stroke();
 
     let y = 150;
@@ -94,20 +83,15 @@ function generateNewsPDF(articles, edition) {
         doc.addPage();
         y = 50;
       }
-
-      // Article number badge
       doc.rect(50, y, 24, 24).fill('#FFD700');
       doc.fillColor('#1a1a2e').fontSize(12).font('Helvetica-Bold')
         .text(`${i + 1}`, 50, y + 6, { width: 24, align: 'center' });
 
-      // Headline
       const title = article.title || 'No title available';
       doc.fillColor('#1a1a2e').fontSize(13).font('Helvetica-Bold')
         .text(title, 85, y, { width: doc.page.width - 135 });
-
       y += doc.heightOfString(title, { width: doc.page.width - 135, font: 'Helvetica-Bold', fontSize: 13 }) + 4;
 
-      // Description
       if (article.description) {
         const desc = article.description.length > 150 ? article.description.substring(0, 150) + '...' : article.description;
         doc.fillColor('#555555').fontSize(10).font('Helvetica')
@@ -115,20 +99,17 @@ function generateNewsPDF(articles, edition) {
         y += doc.heightOfString(desc, { width: doc.page.width - 135, fontSize: 10 }) + 4;
       }
 
-      // Source
       doc.fillColor('#999999').fontSize(9).font('Helvetica-Oblique')
-        .text(`Source: ${article.source?.name || 'Unknown'}`, 85, y);
+        .text(`Source: ${article.source && article.source.name ? article.source.name : 'Unknown'}`, 85, y);
       y += 16;
 
-      // Divider
       doc.moveTo(50, y).lineTo(doc.page.width - 50, y).strokeColor('#e0e0e0').lineWidth(0.5).stroke();
       y += 14;
     });
 
-    // Footer
     doc.rect(0, doc.page.height - 50, doc.page.width, 50).fill('#1a1a2e');
     doc.fillColor('#FFD700').fontSize(10).font('Helvetica-Bold')
-      .text('Brought to you by the almighty Min 🙏', 50, doc.page.height - 32, { align: 'center' });
+      .text('BUILT BY MIN', 50, doc.page.height - 32, { align: 'center' });
 
     doc.end();
     stream.on('finish', () => resolve(filename));
@@ -149,7 +130,7 @@ function formatNews(articles, label) {
 function shouldRespond(msg) {
   const isPrivate = msg.chat.type === 'private';
   const isMentioned = msg.text && msg.text.includes(`@${BOT_USERNAME}`);
-  const isReply = msg.reply_to_message && msg.reply_to_message.from.username === BOT_USERNAME;
+  const isReply = msg.reply_to_message && msg.reply_to_message.from && msg.reply_to_message.from.username === BOT_USERNAME;
   return isPrivate || isMentioned || isReply;
 }
 
@@ -212,8 +193,8 @@ const weeklyQuestions = [
   '💬 *Weekly Big Question*\n\nAre interest rates going to stay higher for longer? How is it affecting you?',
   '💬 *Weekly Big Question*\n\nIs China a good investment opportunity right now? Bullish or bearish?',
   '💬 *Weekly Big Question*\n\nWill crypto become a mainstream asset class in the next 5 years?',
-  '💬 *Weekly Big Question*\n\nIs Singapore\'s economy resilient enough to weather a global slowdown?',
-  '💬 *Weekly Big Question*\n\nWith AI disrupting industries — which sector do you think is most at risk?',
+  '💬 *Weekly Big Question*\n\nIs Singapore economy resilient enough to weather a global slowdown?',
+  '💬 *Weekly Big Question*\n\nWith AI disrupting industries — which sector do you think is most at risk?'
 ];
 
 // ─── MCQ QUESTIONS ────────────────────────────────────────────────
@@ -250,7 +231,7 @@ const mcqQuestions = [
   {
     level: '🟡 Medium',
     question: 'What does CPI measure?',
-    options: ['A — Corporate Profit Index', 'B — Consumer Price Index — tracks inflation', 'C — Central Policy Interest rate', 'D — No clue'],
+    options: ['A — Corporate Profit Index', 'B — Consumer Price Index that tracks inflation', 'C — Central Policy Interest rate', 'D — No clue'],
     answer: 'B',
     explanation: 'CPI stands for Consumer Price Index. It tracks the average change in prices paid by consumers for goods and services. Central banks use it to measure inflation.'
   },
@@ -274,7 +255,7 @@ const mcqQuestions = [
     options: ['A — To print money for the US government', 'B — To manage monetary policy and maintain economic stability', 'C — To regulate Wall Street banks only', 'D — To decide stock prices'],
     answer: 'B',
     explanation: 'The Federal Reserve is the US central bank. Its main goals are to promote maximum employment, stable prices and moderate long-term interest rates through monetary policy.'
-  },
+  }
 ];
 
 let currentMCQIndex = 0;
@@ -322,12 +303,18 @@ const scheduleText =
          Drop your thoughts and debate!
 
 ━━━━━━━━━━━━━━━━━━━━━
-_Brought to you by the almighty Min_ 🙏⚡`;
+_BUILT BY MIN_ ⚡`;
 
 // ─── COMMANDS ─────────────────────────────────────────────────────
 
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id, 'Hello! Start command is working.');
+  bot.sendMessage(msg.chat.id,
+    `👋 Hey welcome to *Nomo News Bot!*\n\n` +
+    `BUILT BY MIN ⚡\n\n` +
+    `Your personal AI news analyst — tap a button or ask me anything! 📰🤖\n\n` +
+    `In a group just mention me with @${BOT_USERNAME} and ask away! 😎`,
+    { parse_mode: 'Markdown', reply_markup: mainKeyboard }
+  );
 });
 
 bot.onText(/\/schedule|📅 Schedule/, (msg) => {
@@ -372,7 +359,7 @@ bot.onText(/\/briefing|☀️ Briefing/, async (msg) => {
     const world = await fetchNews('world');
     const allNews = [...markets, ...world].map(a => a.title).join('\n');
     const summary = await askGroq('Give me a short news briefing based on these headlines. Keep it friendly, simple and easy to understand.', allNews);
-    bot.sendMessage(chatId, `☀️ *Your Daily Briefing*\n\n${summary}\n\n_Brought to you by the almighty Min_ 🙏`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `☀️ *Your Daily Briefing*\n\n${summary}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
   } catch (err) {
     bot.sendMessage(chatId, `😬 Briefing failed. Error: ${err.message}`);
   }
@@ -385,7 +372,7 @@ bot.onText(/\/mood|😎 Mood/, async (msg) => {
     const articles = await fetchNews('markets');
     const headlines = articles.map(a => a.title).join('\n');
     const mood = await askGroq('Based on these headlines what is the overall market sentiment today? Is it bullish bearish or neutral? Give a fun one paragraph summary with an emoji mood rating out of 5.', headlines);
-    bot.sendMessage(chatId, `😎 *Market Mood Today*\n\n${mood}\n\n_Brought to you by the almighty Min_ 🙏`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `😎 *Market Mood Today*\n\n${mood}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
   } catch (err) {
     bot.sendMessage(chatId, `😬 Could not check market mood. Error: ${err.message}`);
   }
@@ -504,13 +491,13 @@ cron.schedule('0 0 * * *', async () => {
     const summary = await askGroq('Give me a short friendly morning briefing. Simple, clear and easy to understand.', allNews);
 
     await bot.sendMessage(CHAT_ID,
-      `☀️ *Good Morning! Your Daily Briefing*\n\n${summary}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      `☀️ *Good Morning! Your Daily Briefing*\n\n${summary}\n\n_BUILT BY MIN_ ⚡`,
       { parse_mode: 'Markdown' }
     );
 
     const pdfPath = await generateNewsPDF(allArticles, 'Morning Edition');
     await bot.sendDocument(CHAT_ID, pdfPath, {
-      caption: `📰 *Nomo News — Morning Edition*\n${new Date().toLocaleDateString('en-SG', { timeZone: 'Asia/Singapore' })}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      caption: `📰 *Nomo News — Morning Edition*\n\n_BUILT BY MIN_ ⚡`,
       parse_mode: 'Markdown'
     });
     fs.unlinkSync(pdfPath);
@@ -560,7 +547,7 @@ cron.schedule('0 3 * * *', async () => {
       `*Question:* ${currentMCQ.question}\n\n` +
       `*Correct Answer: ${currentMCQ.answer}*\n\n` +
       `📖 *Explanation:*\n${currentMCQ.explanation}\n\n` +
-      `_Brought to you by the almighty Min_ 🙏`;
+      `_BUILT BY MIN_ ⚡`;
     bot.sendMessage(CHAT_ID, text, { parse_mode: 'Markdown' });
   } catch (err) {
     console.error('MCQ answer error:', err.message);
@@ -579,13 +566,13 @@ cron.schedule('0 10 * * *', async () => {
     ).join('\n\n');
 
     await bot.sendMessage(CHAT_ID,
-      `🌆 *Evening News Update*\n\n${newsText}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      `🌆 *Evening News Update*\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`,
       { parse_mode: 'Markdown' }
     );
 
     const pdfPath = await generateNewsPDF(allArticles, 'Evening Edition');
     await bot.sendDocument(CHAT_ID, pdfPath, {
-      caption: `📰 *Nomo News — Evening Edition*\n${new Date().toLocaleDateString('en-SG', { timeZone: 'Asia/Singapore' })}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      caption: `📰 *Nomo News — Evening Edition*\n\n_BUILT BY MIN_ ⚡`,
       parse_mode: 'Markdown'
     });
     fs.unlinkSync(pdfPath);
@@ -605,7 +592,7 @@ cron.schedule('0 * * * *', async () => {
       `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
     ).join('\n\n');
     bot.sendMessage(CHAT_ID,
-      `🔔 *Hourly News Update*\n\n${newsText}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      `🔔 *Hourly News Update*\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`,
       { parse_mode: 'Markdown' }
     );
   } catch (err) {
@@ -613,4 +600,4 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 
-console.log('✅ Nomo News Bot is running — built by the almighty Min 🙏');
+console.log('Nomo News Bot is running - BUILT BY MIN');
