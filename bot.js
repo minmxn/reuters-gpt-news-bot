@@ -309,11 +309,11 @@ _BUILT BY MIN_ ⚡`;
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
-    `👋 Hey welcome to *Nomo News Bot!*\n\n` +
+    `👋 Hey welcome to Nomo News Bot!\n\n` +
     `BUILT BY MIN ⚡\n\n` +
     `Your personal AI news analyst — tap a button or ask me anything! 📰🤖\n\n` +
     `In a group just mention me with @${BOT_USERNAME} and ask away! 😎`,
-    { parse_mode: 'Markdown', reply_markup: mainKeyboard }
+    { reply_markup: mainKeyboard }
   );
 });
 
