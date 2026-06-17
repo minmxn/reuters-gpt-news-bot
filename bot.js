@@ -1,24 +1,35 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const Parser = require('rss-parser');
 const cron = require('node-cron');
 
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true });
-const parser = new Parser();
 const CHAT_ID = process.env.CHAT_ID;
+const NEWS_API_KEY = process.env.NEWS_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-const FEEDS = {
-  markets: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines',
-  world: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
-  technology: 'https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml',
-};
+// Fetch news from NewsAPI
+async function fetchNews(category) {
+  const queries = {
+    markets: 'stock market OR financial markets OR wall street',
+    world: 'geopolitics OR world news OR international',
+    technology: 'technology OR AI OR tech news',
+  };
 
-async function fetchNews(category = 'markets') {
-  const feed = await parser.parseURL(FEEDS[category]);
-  return feed.items.slice(0, 5);
+  const response = await axios.get('https://newsapi.org/v2/everything', {
+    params: {
+      q: queries[category],
+      language: 'en',
+      sortBy: 'publishedAt',
+      pageSize: 5,
+      apiKey: NEWS_API_KEY,
+    }
+  });
+
+  return response.data.articles;
 }
 
+// Ask Groq AI
 async function askGroq(question, newsContext = '') {
   const prompt = `You are a witty, friendly financial and geopolitical news analyst built by the almighty Min.
 You explain complex news in plain simple English that anyone can understand.
@@ -32,14 +43,12 @@ Question: ${question}`;
     'https://api.groq.com/openai/v1/chat/completions',
     {
       model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'user', content: prompt }
-      ],
+      messages: [{ role: 'user', content: prompt }],
       max_tokens: 1000,
     },
     {
       headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json'
       }
     }
@@ -48,34 +57,39 @@ Question: ${question}`;
   return response.data.choices[0].message.content;
 }
 
+// Format news articles
 function formatNews(articles, category) {
   const emojis = { markets: '📈', world: '🌍', technology: '💻' };
+  if (!articles || articles.length === 0) return 'No news found right now. Try again later!';
   const header = `${emojis[category] || '📰'} *${category.toUpperCase()} News*\n\n`;
   const body = articles.map((a, i) =>
-    `*${i + 1}. ${a.title}*\n${a.contentSnippet || ''}\n[Read more](${a.link})`
+    `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
   ).join('\n\n');
   return header + body;
 }
 
-// Start command
+// Start command with keyboard buttons
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `👋 Hey welcome to *Reuters GPT Bot!*\n\n` +
     `Built by the almighty Min 🙏⚡\n\n` +
-    `Your personal AI news analyst — straight from the headlines, explained like a friend 📰🤖\n\n` +
-    `Here is what I can do:\n\n` +
-    `📈 /markets — Latest market and stocks news\n` +
-    `🌍 /world — World and geopolitics news\n` +
-    `💻 /tech — Technology news\n` +
-    `☀️ /briefing — Your daily AI news summary\n` +
-    `🤖 /ask [question] — Ask me anything\n\n` +
-    `Or just type any question naturally and I will handle the rest! 😎`,
-    { parse_mode: 'Markdown' }
+    `Your personal AI news analyst — tap a button or just type any question! 📰🤖`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        keyboard: [
+          [{ text: '📈 Markets' }, { text: '🌍 World' }],
+          [{ text: '💻 Tech' }, { text: '☀️ Briefing' }],
+        ],
+        resize_keyboard: true,
+        persistent: true
+      }
+    }
   );
 });
 
-// Markets
-bot.onText(/\/markets/, async (msg) => {
+// Markets button and command
+bot.onText(/\/markets|📈 Markets/, async (msg) => {
   bot.sendMessage(msg.chat.id, '📈 Pulling the latest market news...');
   try {
     const articles = await fetchNews('markets');
@@ -86,8 +100,8 @@ bot.onText(/\/markets/, async (msg) => {
   }
 });
 
-// World
-bot.onText(/\/world/, async (msg) => {
+// World button and command
+bot.onText(/\/world|🌍 World/, async (msg) => {
   bot.sendMessage(msg.chat.id, '🌍 Fetching the latest world and geopolitics news...');
   try {
     const articles = await fetchNews('world');
@@ -98,8 +112,8 @@ bot.onText(/\/world/, async (msg) => {
   }
 });
 
-// Tech
-bot.onText(/\/tech/, async (msg) => {
+// Tech button and command
+bot.onText(/\/tech|💻 Tech/, async (msg) => {
   bot.sendMessage(msg.chat.id, '💻 Getting the latest tech news...');
   try {
     const articles = await fetchNews('technology');
@@ -110,8 +124,8 @@ bot.onText(/\/tech/, async (msg) => {
   }
 });
 
-// Briefing
-bot.onText(/\/briefing/, async (msg) => {
+// Briefing button and command
+bot.onText(/\/briefing|☀️ Briefing/, async (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, '☀️ Hang tight — putting together your briefing...');
   try {
@@ -150,18 +164,21 @@ bot.onText(/\/ask (.+)/, async (msg, match) => {
 
 // Plain text questions
 bot.on('message', async (msg) => {
-  if (msg.text && !msg.text.startsWith('/')) {
-    const chatId = msg.chat.id;
-    bot.sendMessage(chatId, '🤔 On it — checking the latest news for you...');
-    try {
-      const articles = await fetchNews('markets');
-      const newsContext = articles.map(a => a.title).join('\n');
-      const answer = await askGroq(msg.text, newsContext);
-      bot.sendMessage(chatId, `🤖 *Here is what I found:*\n\n${answer}`, { parse_mode: 'Markdown' });
-    } catch (err) {
-      console.error('Message error:', err.message);
-      bot.sendMessage(chatId, `😬 Could not answer that. Error: ${err.message}`);
-    }
+  const text = msg.text;
+  if (!text) return;
+  if (text.startsWith('/')) return;
+  if (['📈 Markets', '🌍 World', '💻 Tech', '☀️ Briefing'].includes(text)) return;
+
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, '🤔 On it — checking the latest news for you...');
+  try {
+    const articles = await fetchNews('markets');
+    const newsContext = articles.map(a => a.title).join('\n');
+    const answer = await askGroq(text, newsContext);
+    bot.sendMessage(chatId, `🤖 *Here is what I found:*\n\n${answer}`, { parse_mode: 'Markdown' });
+  } catch (err) {
+    console.error('Message error:', err.message);
+    bot.sendMessage(chatId, `😬 Could not answer that. Error: ${err.message}`);
   }
 });
 
