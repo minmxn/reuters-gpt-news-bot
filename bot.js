@@ -381,17 +381,19 @@ bot.onText(/\/cn|🇨🇳 China/, async (msg) => {
   }
 });
 
-bot.onText(/\/ask (.+)/, async (msg, match) => {
+bot.onText(/\/testpdf/, async (msg) => {
   const chatId = msg.chat.id;
-  const question = match[1];
-  bot.sendMessage(chatId, '🤔 Good question — let me check the latest news and get back to you...');
+  bot.sendMessage(chatId, '📰 Generating a test PDF magazine...');
   try {
-    const articles = await fetchNews('markets');
-    const newsContext = articles.map(a => a.title).join('\n');
-    const answer = await askGroq(question, newsContext);
-    bot.sendMessage(chatId, `🤖 *Here is what I found:*\n\n${answer}`, { parse_mode: 'Markdown' });
+    const markets = await fetchNews('markets', 10);
+    const world = await fetchNews('world', 10);
+    const tech = await fetchNews('technology', 10);
+    const allArticles = [...markets, ...world, ...tech].slice(0, 15);
+    const pdfPath = await generateNewsPDF(allArticles, 'Test Edition');
+    await bot.sendDocument(chatId, pdfPath, { caption: `📰 *Nomo News — Test Edition*\n\n_BUILT BY MIN_ ⚡`, parse_mode: 'Markdown' });
+    fs.unlinkSync(pdfPath);
   } catch (err) {
-    bot.sendMessage(chatId, `😬 Could not answer that. Error: ${err.message}`);
+    bot.sendMessage(chatId, `😬 PDF test failed. Error: ${err.message}`);
   }
 });
 
