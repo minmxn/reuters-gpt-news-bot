@@ -2,6 +2,9 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const cron = require('node-cron');
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true });
 const CHAT_ID = process.env.CHAT_ID;
@@ -9,7 +12,7 @@ const NEWS_API_KEY = process.env.NEWS_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const BOT_USERNAME = process.env.BOT_USERNAME;
 
-// ─── NEWS FETCHING ───────────────────────────────────────────────
+// ─── NEWS FETCHING ────────────────────────────────────────────────
 
 async function fetchNews(category, pageSize = 10) {
   const queries = {
@@ -37,7 +40,7 @@ async function fetchNewsByCountry(country, pageSize = 5) {
   return response.data.articles;
 }
 
-// ─── GROQ AI ─────────────────────────────────────────────────────
+// ─── GROQ AI ──────────────────────────────────────────────────────
 
 async function askGroq(question, newsContext = '') {
   const prompt = `You are a witty, friendly financial and geopolitical news analyst built by the almighty Min.
@@ -54,7 +57,83 @@ Question: ${question}`;
   return response.data.choices[0].message.content;
 }
 
-// ─── HELPERS ─────────────────────────────────────────────────────
+// ─── PDF GENERATOR ────────────────────────────────────────────────
+
+function generateNewsPDF(articles, edition) {
+  return new Promise((resolve, reject) => {
+    const filename = `/tmp/almighty-news-${edition.toLowerCase().replace(' ', '-')}-${Date.now()}.pdf`;
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const stream = fs.createWriteStream(filename);
+    doc.pipe(stream);
+
+    const now = new Date().toLocaleDateString('en-SG', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Singapore'
+    });
+
+    // Header background
+    doc.rect(0, 0, doc.page.width, 120).fill('#1a1a2e');
+
+    // Title
+    doc.fillColor('#FFD700')
+      .fontSize(32)
+      .font('Helvetica-Bold')
+      .text('THE ALMIGHTY NEWS', 50, 25, { align: 'center' });
+
+    // Edition and date
+    doc.fillColor('#ffffff')
+      .fontSize(14)
+      .font('Helvetica')
+      .text(`${edition}  |  ${now}`, 50, 68, { align: 'center' });
+
+    // Divider line
+    doc.moveTo(50, 130).lineTo(doc.page.width - 50, 130).strokeColor('#FFD700').lineWidth(2).stroke();
+
+    let y = 150;
+
+    articles.slice(0, 15).forEach((article, i) => {
+      if (y > 720) {
+        doc.addPage();
+        y = 50;
+      }
+
+      // Article number badge
+      doc.rect(50, y, 24, 24).fill('#FFD700');
+      doc.fillColor('#1a1a2e').fontSize(12).font('Helvetica-Bold').text(`${i + 1}`, 50, y + 6, { width: 24, align: 'center' });
+
+      // Headline
+      const title = article.title || 'No title available';
+      doc.fillColor('#1a1a2e').fontSize(13).font('Helvetica-Bold').text(title, 85, y, { width: doc.page.width - 135 });
+
+      y += doc.heightOfString(title, { width: doc.page.width - 135, font: 'Helvetica-Bold', fontSize: 13 }) + 4;
+
+      // Description
+      if (article.description) {
+        const desc = article.description.length > 150 ? article.description.substring(0, 150) + '...' : article.description;
+        doc.fillColor('#555555').fontSize(10).font('Helvetica').text(desc, 85, y, { width: doc.page.width - 135 });
+        y += doc.heightOfString(desc, { width: doc.page.width - 135, fontSize: 10 }) + 4;
+      }
+
+      // Source and divider
+      doc.fillColor('#999999').fontSize(9).font('Helvetica-Oblique')
+        .text(`Source: ${article.source?.name || 'Unknown'}`, 85, y);
+      y += 16;
+
+      doc.moveTo(50, y).lineTo(doc.page.width - 50, y).strokeColor('#e0e0e0').lineWidth(0.5).stroke();
+      y += 14;
+    });
+
+    // Footer
+    doc.rect(0, doc.page.height - 50, doc.page.width, 50).fill('#1a1a2e');
+    doc.fillColor('#FFD700').fontSize(10).font('Helvetica-Bold')
+      .text('Brought to you by the almighty Min 🙏', 50, doc.page.height - 32, { align: 'center' });
+
+    doc.end();
+    stream.on('finish', () => resolve(filename));
+    stream.on('error', reject);
+  });
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────
 
 function formatNews(articles, label) {
   if (!articles || articles.length === 0) return 'No news found right now. Try again later!';
@@ -75,7 +154,7 @@ function cleanMessage(text) {
   return text.replace(`@${BOT_USERNAME}`, '').trim();
 }
 
-// ─── KEYBOARD ────────────────────────────────────────────────────
+// ─── KEYBOARD ─────────────────────────────────────────────────────
 
 const mainKeyboard = {
   keyboard: [
@@ -89,35 +168,35 @@ const mainKeyboard = {
   persistent: true
 };
 
-// ─── DAILY POLLS ─────────────────────────────────────────────────
+// ─── DAILY POLLS ──────────────────────────────────────────────────
 
 const dailyPolls = {
-  1: { // Monday
-    question: '🗳️ *Monday Market Pulse*\n\nHow are you feeling about markets this week?',
+  1: {
+    question: '🗳️ Monday Market Pulse\n\nHow are you feeling about markets this week?',
     options: ['📈 Bullish — expecting gains', '📉 Bearish — expecting drops', '😐 Neutral — nothing exciting', '🤷 Not sure yet', '👀 Here to observe and learn']
   },
-  2: { // Tuesday
-    question: '🗳️ *Sector Spotlight*\n\nWhich sector do you think performs best this week?',
+  2: {
+    question: '🗳️ Sector Spotlight\n\nWhich sector do you think performs best this week?',
     options: ['💻 Technology', '🏦 Banking and Finance', '🛢️ Oil and Energy', '🏥 Healthcare', '🤷 Too hard to call']
   },
-  3: { // Wednesday
-    question: '🗳️ *Mid Week Check*\n\nHow are markets performing vs your expectation?',
+  3: {
+    question: '🗳️ Mid Week Check\n\nHow are markets performing vs your expectation?',
     options: ['🚀 Better than expected', '😅 Worse than expected', '😐 Pretty much as expected', '🤷 Will check on Friday']
   },
-  4: { // Thursday
-    question: '🗳️ *Biggest Market Risk Right Now*\n\nWhat do you think is the biggest threat to markets?',
+  4: {
+    question: '🗳️ Biggest Market Risk Right Now\n\nWhat do you think is the biggest threat to markets?',
     options: ['🇺🇸 US recession fears', '🇨🇳 China slowdown', '💸 Inflation returning', '⚔️ Geopolitical tensions', '🤷 Honestly all of the above']
   },
-  5: { // Friday
-    question: '🗳️ *Friday Verdict*\n\nHow did markets perform vs your prediction this week?',
+  5: {
+    question: '🗳️ Friday Verdict\n\nHow did markets perform vs your prediction this week?',
     options: ['🎯 Called it perfectly', '😅 Surprised me completely', '💀 Nobody saw that coming', '🤷 I only check on Fridays', '👀 Setting up for next week']
   },
-  6: { // Saturday
-    question: '🗳️ *Weekend Read*\n\nWhat topic do you want more coverage on?',
+  6: {
+    question: '🗳️ Weekend Read\n\nWhat topic do you want more coverage on?',
     options: ['📈 Stock market deep dives', '🌍 Geopolitics and market impact', '💰 Crypto and digital assets', '🏦 Central banks and interest rates', '🌏 Asia and Singapore markets']
   },
-  0: { // Sunday
-    question: '🗳️ *Sunday Prediction Corner*\n\nYour call for next week — S&P 500?',
+  0: {
+    question: '🗳️ Sunday Prediction Corner\n\nYour call for next week — S&P 500?',
     options: ['📈 Up more than 1%', '📈 Up less than 1%', '😐 Flat', '📉 Down less than 1%', '📉 Down more than 1%', '🤷 Markets are unpredictable']
   }
 };
@@ -150,7 +229,7 @@ const mcqQuestions = [
     question: 'When the Fed raises interest rates, what typically happens to bond prices?',
     options: ['A — They go up', 'B — They go down', 'C — They stay the same', 'D — What is a bond?'],
     answer: 'B',
-    explanation: 'When interest rates rise, existing bond prices fall. This is because new bonds are issued at higher rates making older lower-rate bonds less attractive to investors.'
+    explanation: 'When interest rates rise, existing bond prices fall. New bonds are issued at higher rates making older lower-rate bonds less attractive to investors.'
   },
   {
     level: '🔴 Hard',
@@ -164,62 +243,93 @@ const mcqQuestions = [
     question: 'What does GDP stand for?',
     options: ['A — Global Development Plan', 'B — Gross Domestic Product', 'C — General Dollar Price', 'D — I know this one... maybe'],
     answer: 'B',
-    explanation: 'GDP stands for Gross Domestic Product. It measures the total value of all goods and services produced in a country over a specific period and is the primary measure of economic health.'
+    explanation: 'GDP stands for Gross Domestic Product. It measures the total value of all goods and services produced in a country and is the primary measure of economic health.'
   },
   {
     level: '🟡 Medium',
     question: 'What does CPI measure?',
     options: ['A — Corporate Profit Index', 'B — Consumer Price Index — tracks inflation', 'C — Central Policy Interest rate', 'D — No clue'],
     answer: 'B',
-    explanation: 'CPI stands for Consumer Price Index. It tracks the average change in prices paid by consumers for goods and services over time. Central banks use it to measure inflation.'
+    explanation: 'CPI stands for Consumer Price Index. It tracks the average change in prices paid by consumers for goods and services. Central banks use it to measure inflation.'
   },
   {
     level: '🔴 Hard',
     question: 'What is quantitative easing?',
     options: ['A — A central bank selling bonds to reduce money supply', 'B — A central bank buying bonds to inject money into the economy', 'C — A government raising taxes to control inflation', 'D — A way to make economics easier to understand'],
     answer: 'B',
-    explanation: 'Quantitative easing is when a central bank purchases government bonds and other assets to inject money directly into the economy. It is used to stimulate growth when interest rates are already near zero.'
+    explanation: 'Quantitative easing is when a central bank purchases bonds to inject money into the economy. It is used to stimulate growth when interest rates are already near zero.'
   },
   {
     level: '🟢 Easy',
     question: 'What does a bear market mean?',
     options: ['A — Markets are rising strongly', 'B — Markets have fallen 20% or more from recent highs', 'C — A market dominated by animal stocks', 'D — When traders are in a bad mood'],
     answer: 'B',
-    explanation: 'A bear market is defined as a decline of 20% or more from recent highs in a market index. It typically reflects widespread pessimism and negative investor sentiment.'
+    explanation: 'A bear market is defined as a decline of 20% or more from recent highs in a market index. It reflects widespread pessimism and negative investor sentiment.'
   },
   {
     level: '🟡 Medium',
     question: 'What is the main purpose of the Federal Reserve?',
     options: ['A — To print money for the US government', 'B — To manage monetary policy and maintain economic stability', 'C — To regulate Wall Street banks only', 'D — To decide stock prices'],
     answer: 'B',
-    explanation: 'The Federal Reserve is the central bank of the United States. Its main goals are to promote maximum employment, stable prices and moderate long-term interest rates through monetary policy.'
+    explanation: 'The Federal Reserve is the US central bank. Its main goals are to promote maximum employment, stable prices and moderate long-term interest rates through monetary policy.'
   },
 ];
 
 let currentMCQIndex = 0;
 let currentMCQ = null;
 
-// ─── SCHEDULE COMMAND ─────────────────────────────────────────────
+// ─── SCHEDULE TEXT ────────────────────────────────────────────────
 
 const scheduleText =
-  `📅 *The Almighty News Bot — Daily Schedule* 🇸🇬 SGT\n\n` +
-  `☀️ *8:00am* — Morning Briefing — AI summary of overnight news\n` +
-  `🗳️ *9:00am* — Daily Poll — market sentiment question\n` +
-  `🧠 *10:00am* — Daily MCQ Quiz — test your market knowledge\n` +
-  `✅ *11:00am* — MCQ Answer Revealed — with full explanation\n` +
-  `🌆 *6:00pm* — Evening News Update — top 15 news of the day\n` +
-  `🔔 *Every Hour* — Hourly News Update — top 15 latest headlines\n\n` +
-  `_All times are Singapore Time GMT+8_ 🇸🇬\n\n` +
-  `_Brought to you by the almighty Min_ 🙏⚡`;
+`📅 *THE ALMIGHTY NEWS BOT*
+*Daily Schedule* 🇸🇬 Singapore Time
 
-// ─── COMMANDS ────────────────────────────────────────────────────
+━━━━━━━━━━━━━━━━━━━━━
+🌅 *MORNING*
+━━━━━━━━━━━━━━━━━━━━━
+☀️  8:00am — Morning Briefing
+         AI summary of overnight news
+         + Morning Edition PDF Magazine
+
+🗳️  9:00am — Daily Poll
+         Market sentiment question
+
+🧠 10:00am — Daily MCQ Quiz
+         Test your market knowledge
+
+✅ 11:00am — MCQ Answer Revealed
+         With full explanation
+
+━━━━━━━━━━━━━━━━━━━━━
+🌆 *EVENING*
+━━━━━━━━━━━━━━━━━━━━━
+📰  6:00pm — Evening News Update
+         Top 15 headlines of the day
+         + Evening Edition PDF Magazine
+
+━━━━━━━━━━━━━━━━━━━━━
+🔄 *THROUGHOUT THE DAY*
+━━━━━━━━━━━━━━━━━━━━━
+🔔  Every Hour — Live News Update
+         Top 15 latest headlines
+
+━━━━━━━━━━━━━━━━━━━━━
+💬 *EVERY MONDAY*
+━━━━━━━━━━━━━━━━━━━━━
+💡  Weekly Big Question
+         Drop your thoughts and debate!
+
+━━━━━━━━━━━━━━━━━━━━━
+_Brought to you by the almighty Min_ 🙏⚡`;
+
+// ─── COMMANDS ─────────────────────────────────────────────────────
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `👋 Hey welcome to *The Almighty News Bot!*\n\n` +
     `Built by the almighty Min 🙏⚡\n\n` +
     `Your personal AI news analyst — tap a button or ask me anything! 📰🤖\n\n` +
-    `In a group mention me with @${BOT_USERNAME} to get my attention! 😎`,
+    `In a group just mention me with @${BOT_USERNAME} and ask away! 😎`,
     { parse_mode: 'Markdown', reply_markup: mainKeyboard }
   );
 });
@@ -361,7 +471,7 @@ bot.onText(/\/ask (.+)/, async (msg, match) => {
   }
 });
 
-// Plain text handler
+// Plain text and group mention handler
 bot.on('message', async (msg) => {
   const text = msg.text;
   if (!text) return;
@@ -387,14 +497,29 @@ bot.on('message', async (msg) => {
 
 // ─── SCHEDULED TASKS (SGT = UTC+8) ───────────────────────────────
 
-// Morning briefing at 8am SGT (0am UTC)
+// Morning briefing + PDF at 8am SGT (0am UTC)
 cron.schedule('0 0 * * *', async () => {
   try {
-    const markets = await fetchNews('markets');
-    const world = await fetchNews('world');
-    const allNews = [...markets, ...world].map(a => a.title).join('\n');
+    const markets = await fetchNews('markets', 10);
+    const world = await fetchNews('world', 10);
+    const tech = await fetchNews('technology', 10);
+    const allArticles = [...markets, ...world, ...tech].slice(0, 15);
+    const allNews = allArticles.map(a => a.title).join('\n');
     const summary = await askGroq('Give me a short friendly morning briefing. Simple, clear and easy to understand.', allNews);
-    bot.sendMessage(CHAT_ID, `☀️ *Good Morning! Your Daily Briefing is here*\n\n${summary}\n\n_Brought to you by the almighty Min_ 🙏⚡`, { parse_mode: 'Markdown' });
+
+    // Send text briefing
+    await bot.sendMessage(CHAT_ID,
+      `☀️ *Good Morning! Your Daily Briefing*\n\n${summary}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      { parse_mode: 'Markdown' }
+    );
+
+    // Generate and send morning PDF
+    const pdfPath = await generateNewsPDF(allArticles, 'Morning Edition');
+    await bot.sendDocument(CHAT_ID, pdfPath, {
+      caption: `📰 *The Almighty News — Morning Edition*\n${new Date().toLocaleDateString('en-SG', { timeZone: 'Asia/Singapore' })}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      parse_mode: 'Markdown'
+    });
+    fs.unlinkSync(pdfPath);
   } catch (err) {
     console.error('Morning briefing error:', err.message);
   }
@@ -405,9 +530,8 @@ cron.schedule('0 1 * * *', async () => {
   try {
     const day = new Date().getDay();
     const poll = dailyPolls[day];
-    await bot.sendPoll(CHAT_ID, poll.question, poll.options, { is_anonymous: false, parse_mode: 'Markdown' });
+    await bot.sendPoll(CHAT_ID, poll.question, poll.options, { is_anonymous: false });
 
-    // Weekly big question on Mondays
     if (day === 1) {
       const weekNum = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % weeklyQuestions.length;
       bot.sendMessage(CHAT_ID, weeklyQuestions[weekNum] + '\n\n_Drop your thoughts below — all views welcome!_ 👇', { parse_mode: 'Markdown' });
@@ -449,17 +573,30 @@ cron.schedule('0 3 * * *', async () => {
   }
 });
 
-// Evening news at 6pm SGT (10am UTC)
+// Evening news + PDF at 6pm SGT (10am UTC)
 cron.schedule('0 10 * * *', async () => {
   try {
     const markets = await fetchNews('markets', 10);
     const world = await fetchNews('world', 10);
     const tech = await fetchNews('technology', 10);
-    const topNews = [...markets, ...world, ...tech].slice(0, 15);
-    const newsText = topNews.map((a, i) =>
+    const allArticles = [...markets, ...world, ...tech].slice(0, 15);
+    const newsText = allArticles.map((a, i) =>
       `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
     ).join('\n\n');
-    bot.sendMessage(CHAT_ID, `🌆 *Evening News Update*\n\n${newsText}\n\n_Brought to you by the almighty Min_ 🙏⚡`, { parse_mode: 'Markdown' });
+
+    // Send text update
+    await bot.sendMessage(CHAT_ID,
+      `🌆 *Evening News Update*\n\n${newsText}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      { parse_mode: 'Markdown' }
+    );
+
+    // Generate and send evening PDF
+    const pdfPath = await generateNewsPDF(allArticles, 'Evening Edition');
+    await bot.sendDocument(CHAT_ID, pdfPath, {
+      caption: `📰 *The Almighty News — Evening Edition*\n${new Date().toLocaleDateString('en-SG', { timeZone: 'Asia/Singapore' })}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      parse_mode: 'Markdown'
+    });
+    fs.unlinkSync(pdfPath);
   } catch (err) {
     console.error('Evening news error:', err.message);
   }
@@ -475,7 +612,10 @@ cron.schedule('0 * * * *', async () => {
     const newsText = topNews.map((a, i) =>
       `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
     ).join('\n\n');
-    bot.sendMessage(CHAT_ID, `🔔 *Hourly News Update*\n\n${newsText}\n\n_Brought to you by the almighty Min_ 🙏⚡`, { parse_mode: 'Markdown' });
+    bot.sendMessage(CHAT_ID,
+      `🔔 *Hourly News Update*\n\n${newsText}\n\n_Brought to you by the almighty Min_ 🙏⚡`,
+      { parse_mode: 'Markdown' }
+    );
   } catch (err) {
     console.error('Hourly update error:', err.message);
   }
