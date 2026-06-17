@@ -1,4 +1,4 @@
-require('dotenv').config();
+frequire('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const cron = require('node-cron');
@@ -328,13 +328,7 @@ _Brought to you by the almighty Min_ 🙏⚡`;
 // ─── COMMANDS ─────────────────────────────────────────────────────
 
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id,
-    `👋 Hey welcome to *Nomo News Bot!*\n\n` +
-    `Built by the almighty Min 🙏⚡\n\n` +
-    `Your personal AI news analyst — tap a button or ask me anything! 📰🤖\n\n` +
-    `In a group just mention me with @nomogh_bot and ask away! 😎`,
-    { parse_mode: 'Markdown', reply_markup: mainKeyboard }
-  );
+  bot.sendMessage(msg.chat.id, 'Hello! Start command is working.');
 });
 
 bot.onText(/\/schedule|📅 Schedule/, (msg) => {
