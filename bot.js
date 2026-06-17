@@ -9,12 +9,12 @@ const NEWS_API_KEY = process.env.NEWS_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const BOT_USERNAME = process.env.BOT_USERNAME;
 
-// Fetch news from NewsAPI
+// Fetch news by category
 async function fetchNews(category, pageSize = 10) {
   const queries = {
-    markets: 'stock market OR financial markets OR wall street',
-    world: 'geopolitics OR world news OR international',
-    technology: 'technology OR AI OR tech news',
+    markets: 'stock market OR financial markets OR S&P500 OR nasdaq OR dow jones',
+    world: 'geopolitics OR international relations OR war OR diplomacy OR sanctions',
+    technology: 'artificial intelligence OR technology OR semiconductor OR cybersecurity',
   };
 
   const response = await axios.get('https://newsapi.org/v2/everything', {
@@ -30,7 +30,7 @@ async function fetchNews(category, pageSize = 10) {
   return response.data.articles;
 }
 
-// Fetch news by custom keyword
+// Fetch news by keyword
 async function fetchNewsByKeyword(keyword, pageSize = 5) {
   const response = await axios.get('https://newsapi.org/v2/everything', {
     params: {
@@ -45,11 +45,11 @@ async function fetchNewsByKeyword(keyword, pageSize = 5) {
 }
 
 // Fetch news by country
-async function fetchNewsByCountry(country) {
+async function fetchNewsByCountry(country, pageSize = 5) {
   const response = await axios.get('https://newsapi.org/v2/top-headlines', {
     params: {
       country,
-      pageSize: 5,
+      pageSize,
       apiKey: NEWS_API_KEY,
     }
   });
@@ -93,7 +93,7 @@ function formatNews(articles, label) {
   return `📰 *${label}*\n\n${body}`;
 }
 
-// Check if bot should respond
+// Check if bot should respond in group
 function shouldRespond(msg) {
   const isPrivate = msg.chat.type === 'private';
   const isMentioned = msg.text && msg.text.includes(`@${BOT_USERNAME}`);
@@ -106,36 +106,27 @@ function cleanMessage(text) {
   return text.replace(`@${BOT_USERNAME}`, '').trim();
 }
 
-// Start command with keyboard buttons
+// Keyboard layout
+const mainKeyboard = {
+  keyboard: [
+    [{ text: '📈 Markets' }, { text: '🌍 World' }],
+    [{ text: '💻 Tech' }, { text: '☀️ Briefing' }],
+    [{ text: '😎 Mood' }, { text: '🔍 Search' }],
+    [{ text: '🌏 Singapore' }, { text: '🇺🇸 US' }, { text: '🇨🇳 China' }],
+    [{ text: '📊 Stock' }],
+  ],
+  resize_keyboard: true,
+  persistent: true
+};
+
+// Start command
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `👋 Hey welcome to *The Almighty News Bot!*\n\n` +
     `Built by the almighty Min 🙏⚡\n\n` +
     `Your personal AI news analyst — tap a button or ask me anything! 📰🤖\n\n` +
-    `*Commands:*\n` +
-    `📈 /markets — Market and stocks news\n` +
-    `🌍 /world — World and geopolitics news\n` +
-    `💻 /tech — Technology news\n` +
-    `☀️ /briefing — Daily AI news summary\n` +
-    `🔍 /search [keyword] — Search any topic\n` +
-    `📊 /stock [ticker] — News about a stock\n` +
-    `😎 /mood — Market sentiment today\n` +
-    `🌏 /sg — Singapore news\n` +
-    `🇺🇸 /us — US news\n` +
-    `🇨🇳 /cn — China news\n\n` +
     `In a group mention me with @${BOT_USERNAME} to get my attention! 😎`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        keyboard: [
-          [{ text: '📈 Markets' }, { text: '🌍 World' }],
-          [{ text: '💻 Tech' }, { text: '☀️ Briefing' }],
-          [{ text: '😎 Mood' }, { text: '🔍 Search' }],
-        ],
-        resize_keyboard: true,
-        persistent: true
-      }
-    }
+    { parse_mode: 'Markdown', reply_markup: mainKeyboard }
   );
 });
 
@@ -193,6 +184,33 @@ bot.onText(/\/briefing|☀️ Briefing/, async (msg) => {
   }
 });
 
+// Mood
+bot.onText(/\/mood|😎 Mood/, async (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, '😎 Checking the market mood today...');
+  try {
+    const articles = await fetchNews('markets');
+    const headlines = articles.map(a => a.title).join('\n');
+    const mood = await askGroq(
+      'Based on these headlines what is the overall market sentiment today? Is it bullish bearish or neutral? Give a fun one paragraph summary with an emoji mood rating out of 5.',
+      headlines
+    );
+    bot.sendMessage(chatId,
+      `😎 *Market Mood Today*\n\n${mood}\n\n_Brought to you by the almighty Min_ 🙏`,
+      { parse_mode: 'Markdown' }
+    );
+  } catch (err) {
+    bot.sendMessage(chatId, `😬 Could not check market mood. Error: ${err.message}`);
+  }
+});
+
+// Search button prompt
+bot.onText(/🔍 Search/, (msg) => {
+  bot.sendMessage(msg.chat.id,
+    '🔍 Type /search followed by any topic!\n\nExamples:\n/search Bitcoin\n/search Nvidia earnings\n/search Singapore economy\n/search Fed rate cut'
+  );
+});
+
 // Search command
 bot.onText(/\/search (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
@@ -206,12 +224,14 @@ bot.onText(/\/search (.+)/, async (msg, match) => {
   }
 });
 
-// Search button prompt
-bot.onText(/🔍 Search/, async (msg) => {
-  bot.sendMessage(msg.chat.id, '🔍 Type /search followed by any topic!\n\nExamples:\n/search Bitcoin\n/search Nvidia earnings\n/search Singapore economy');
+// Stock button prompt
+bot.onText(/📊 Stock/, (msg) => {
+  bot.sendMessage(msg.chat.id,
+    '📊 Type /stock followed by a ticker!\n\nExamples:\n/stock NVDA\n/stock AAPL\n/stock TSLA\n/stock META'
+  );
 });
 
-// Stock news command
+// Stock command
 bot.onText(/\/stock (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const ticker = match[1].toUpperCase();
@@ -224,25 +244,8 @@ bot.onText(/\/stock (.+)/, async (msg, match) => {
   }
 });
 
-// Market mood / sentiment
-bot.onText(/\/mood|😎 Mood/, async (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(chatId, '😎 Checking the market mood today...');
-  try {
-    const articles = await fetchNews('markets');
-    const headlines = articles.map(a => a.title).join('\n');
-    const mood = await askGroq(
-      'Based on these headlines, what is the overall market sentiment today? Is it bullish, bearish or neutral? Give a fun one paragraph summary with an emoji mood rating out of 5.',
-      headlines
-    );
-    bot.sendMessage(chatId, `😎 *Market Mood Today*\n\n${mood}\n\n_Brought to you by the almighty Min_ 🙏`, { parse_mode: 'Markdown' });
-  } catch (err) {
-    bot.sendMessage(chatId, `😬 Could not check market mood. Error: ${err.message}`);
-  }
-});
-
-// Singapore news
-bot.onText(/\/sg/, async (msg) => {
+// Singapore
+bot.onText(/\/sg|🌏 Singapore/, async (msg) => {
   bot.sendMessage(msg.chat.id, '🌏 Fetching Singapore news...');
   try {
     const articles = await fetchNewsByCountry('sg');
@@ -252,8 +255,8 @@ bot.onText(/\/sg/, async (msg) => {
   }
 });
 
-// US news
-bot.onText(/\/us/, async (msg) => {
+// US
+bot.onText(/\/us|🇺🇸 US/, async (msg) => {
   bot.sendMessage(msg.chat.id, '🇺🇸 Fetching US news...');
   try {
     const articles = await fetchNewsByCountry('us');
@@ -263,8 +266,8 @@ bot.onText(/\/us/, async (msg) => {
   }
 });
 
-// China news
-bot.onText(/\/cn/, async (msg) => {
+// China
+bot.onText(/\/cn|🇨🇳 China/, async (msg) => {
   bot.sendMessage(msg.chat.id, '🇨🇳 Fetching China news...');
   try {
     const articles = await fetchNewsByCountry('cn');
@@ -294,7 +297,8 @@ bot.on('message', async (msg) => {
   const text = msg.text;
   if (!text) return;
   if (text.startsWith('/')) return;
-  if (['📈 Markets', '🌍 World', '💻 Tech', '☀️ Briefing', '😎 Mood', '🔍 Search'].includes(text)) return;
+  const buttonTexts = ['📈 Markets', '🌍 World', '💻 Tech', '☀️ Briefing', '😎 Mood', '🔍 Search', '🌏 Singapore', '🇺🇸 US', '🇨🇳 China', '📊 Stock'];
+  if (buttonTexts.includes(text)) return;
   if (!shouldRespond(msg)) return;
 
   const chatId = msg.chat.id;
