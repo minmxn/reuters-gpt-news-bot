@@ -11,6 +11,8 @@ const NEWS_API_KEY = process.env.NEWS_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const BOT_USERNAME = process.env.BOT_USERNAME || 'nomogh_bot';
 
+const TZ = 'Asia/Singapore';
+
 // ─── NEWS FETCHING ────────────────────────────────────────────────
 
 async function fetchNews(category, pageSize = 10) {
@@ -66,7 +68,7 @@ function generateNewsPDF(articles, edition) {
     doc.pipe(stream);
 
     const now = new Date().toLocaleDateString('en-SG', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Singapore'
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: TZ
     });
 
     doc.rect(0, 0, doc.page.width, 120).fill('#1a1a2e');
@@ -138,6 +140,20 @@ function cleanMessage(text) {
   return text.replace(`@${BOT_USERNAME}`, '').trim();
 }
 
+async function postNewsUpdate(label) {
+  const markets = await fetchNews('markets', 10);
+  const world = await fetchNews('world', 10);
+  const tech = await fetchNews('technology', 10);
+  const topNews = [...markets, ...world, ...tech].slice(0, 15);
+  const newsText = topNews.map((a, i) =>
+    `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
+  ).join('\n\n');
+  await bot.sendMessage(CHAT_ID,
+    `${label}\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`,
+    { parse_mode: 'Markdown' }
+  );
+}
+
 // ─── KEYBOARD ─────────────────────────────────────────────────────
 
 const mainKeyboard = {
@@ -154,34 +170,13 @@ const mainKeyboard = {
 // ─── DAILY POLLS ──────────────────────────────────────────────────
 
 const dailyPolls = {
-  1: {
-    question: '🗳️ Monday Market Pulse\n\nHow are you feeling about markets this week?',
-    options: ['📈 Bullish — expecting gains', '📉 Bearish — expecting drops', '😐 Neutral — nothing exciting', '🤷 Not sure yet', '👀 Here to observe and learn']
-  },
-  2: {
-    question: '🗳️ Sector Spotlight\n\nWhich sector do you think performs best this week?',
-    options: ['💻 Technology', '🏦 Banking and Finance', '🛢️ Oil and Energy', '🏥 Healthcare', '🤷 Too hard to call']
-  },
-  3: {
-    question: '🗳️ Mid Week Check\n\nHow are markets performing vs your expectation?',
-    options: ['🚀 Better than expected', '😅 Worse than expected', '😐 Pretty much as expected', '🤷 Will check on Friday']
-  },
-  4: {
-    question: '🗳️ Biggest Market Risk Right Now\n\nWhat do you think is the biggest threat to markets?',
-    options: ['🇺🇸 US recession fears', '🇨🇳 China slowdown', '💸 Inflation returning', '⚔️ Geopolitical tensions', '🤷 Honestly all of the above']
-  },
-  5: {
-    question: '🗳️ Friday Verdict\n\nHow did markets perform vs your prediction this week?',
-    options: ['🎯 Called it perfectly', '😅 Surprised me completely', '💀 Nobody saw that coming', '🤷 I only check on Fridays', '👀 Setting up for next week']
-  },
-  6: {
-    question: '🗳️ Weekend Read\n\nWhat topic do you want more coverage on?',
-    options: ['📈 Stock market deep dives', '🌍 Geopolitics and market impact', '💰 Crypto and digital assets', '🏦 Central banks and interest rates', '🌏 Asia and Singapore markets']
-  },
-  0: {
-    question: '🗳️ Sunday Prediction Corner\n\nYour call for next week — S&P 500?',
-    options: ['📈 Up more than 1%', '📈 Up less than 1%', '😐 Flat', '📉 Down less than 1%', '📉 Down more than 1%', '🤷 Markets are unpredictable']
-  }
+  1: { question: '🗳️ Monday Market Pulse\n\nHow are you feeling about markets this week?', options: ['📈 Bullish — expecting gains', '📉 Bearish — expecting drops', '😐 Neutral — nothing exciting', '🤷 Not sure yet', '👀 Here to observe and learn'] },
+  2: { question: '🗳️ Sector Spotlight\n\nWhich sector do you think performs best this week?', options: ['💻 Technology', '🏦 Banking and Finance', '🛢️ Oil and Energy', '🏥 Healthcare', '🤷 Too hard to call'] },
+  3: { question: '🗳️ Mid Week Check\n\nHow are markets performing vs your expectation?', options: ['🚀 Better than expected', '😅 Worse than expected', '😐 Pretty much as expected', '🤷 Will check on Friday'] },
+  4: { question: '🗳️ Biggest Market Risk Right Now\n\nWhat do you think is the biggest threat to markets?', options: ['🇺🇸 US recession fears', '🇨🇳 China slowdown', '💸 Inflation returning', '⚔️ Geopolitical tensions', '🤷 Honestly all of the above'] },
+  5: { question: '🗳️ Friday Verdict\n\nHow did markets perform vs your prediction this week?', options: ['🎯 Called it perfectly', '😅 Surprised me completely', '💀 Nobody saw that coming', '🤷 I only check on Fridays', '👀 Setting up for next week'] },
+  6: { question: '🗳️ Weekend Read\n\nWhat topic do you want more coverage on?', options: ['📈 Stock market deep dives', '🌍 Geopolitics and market impact', '💰 Crypto and digital assets', '🏦 Central banks and interest rates', '🌏 Asia and Singapore markets'] },
+  0: { question: '🗳️ Sunday Prediction Corner\n\nYour call for next week — S&P 500?', options: ['📈 Up more than 1%', '📈 Up less than 1%', '😐 Flat', '📉 Down less than 1%', '📉 Down more than 1%', '🤷 Markets are unpredictable'] }
 };
 
 // ─── WEEKLY BIG QUESTIONS ─────────────────────────────────────────
@@ -200,62 +195,14 @@ const weeklyQuestions = [
 // ─── MCQ QUESTIONS ────────────────────────────────────────────────
 
 const mcqQuestions = [
-  {
-    level: '🟢 Easy',
-    question: 'What does the S&P 500 track?',
-    options: ['A — Top 500 US companies by market cap', 'B — Top 500 global companies', 'C — Top 500 tech companies only', 'D — No idea, just here for the memes'],
-    answer: 'A',
-    explanation: 'The S&P 500 tracks the 500 largest publicly traded companies in the US by market capitalisation. It is the most widely followed benchmark for the US stock market.'
-  },
-  {
-    level: '🟡 Medium',
-    question: 'When the Fed raises interest rates, what typically happens to bond prices?',
-    options: ['A — They go up', 'B — They go down', 'C — They stay the same', 'D — What is a bond?'],
-    answer: 'B',
-    explanation: 'When interest rates rise, existing bond prices fall. New bonds are issued at higher rates making older lower-rate bonds less attractive to investors.'
-  },
-  {
-    level: '🔴 Hard',
-    question: 'What does a yield curve inversion typically signal?',
-    options: ['A — Strong economic growth ahead', 'B — Potential recession ahead', 'C — High inflation incoming', 'D — Time to Google this'],
-    answer: 'B',
-    explanation: 'A yield curve inversion happens when short-term bond yields exceed long-term yields. Historically this has been one of the most reliable indicators of a coming recession.'
-  },
-  {
-    level: '🟢 Easy',
-    question: 'What does GDP stand for?',
-    options: ['A — Global Development Plan', 'B — Gross Domestic Product', 'C — General Dollar Price', 'D — I know this one... maybe'],
-    answer: 'B',
-    explanation: 'GDP stands for Gross Domestic Product. It measures the total value of all goods and services produced in a country and is the primary measure of economic health.'
-  },
-  {
-    level: '🟡 Medium',
-    question: 'What does CPI measure?',
-    options: ['A — Corporate Profit Index', 'B — Consumer Price Index that tracks inflation', 'C — Central Policy Interest rate', 'D — No clue'],
-    answer: 'B',
-    explanation: 'CPI stands for Consumer Price Index. It tracks the average change in prices paid by consumers for goods and services. Central banks use it to measure inflation.'
-  },
-  {
-    level: '🔴 Hard',
-    question: 'What is quantitative easing?',
-    options: ['A — A central bank selling bonds to reduce money supply', 'B — A central bank buying bonds to inject money into the economy', 'C — A government raising taxes to control inflation', 'D — A way to make economics easier to understand'],
-    answer: 'B',
-    explanation: 'Quantitative easing is when a central bank purchases bonds to inject money into the economy. It is used to stimulate growth when interest rates are already near zero.'
-  },
-  {
-    level: '🟢 Easy',
-    question: 'What does a bear market mean?',
-    options: ['A — Markets are rising strongly', 'B — Markets have fallen 20% or more from recent highs', 'C — A market dominated by animal stocks', 'D — When traders are in a bad mood'],
-    answer: 'B',
-    explanation: 'A bear market is defined as a decline of 20% or more from recent highs in a market index. It reflects widespread pessimism and negative investor sentiment.'
-  },
-  {
-    level: '🟡 Medium',
-    question: 'What is the main purpose of the Federal Reserve?',
-    options: ['A — To print money for the US government', 'B — To manage monetary policy and maintain economic stability', 'C — To regulate Wall Street banks only', 'D — To decide stock prices'],
-    answer: 'B',
-    explanation: 'The Federal Reserve is the US central bank. Its main goals are to promote maximum employment, stable prices and moderate long-term interest rates through monetary policy.'
-  }
+  { level: '🟢 Easy', question: 'What does the S&P 500 track?', options: ['A — Top 500 US companies by market cap', 'B — Top 500 global companies', 'C — Top 500 tech companies only', 'D — No idea, just here for the memes'], answer: 'A', explanation: 'The S&P 500 tracks the 500 largest publicly traded companies in the US by market capitalisation. It is the most widely followed benchmark for the US stock market.' },
+  { level: '🟡 Medium', question: 'When the Fed raises interest rates, what typically happens to bond prices?', options: ['A — They go up', 'B — They go down', 'C — They stay the same', 'D — What is a bond?'], answer: 'B', explanation: 'When interest rates rise, existing bond prices fall. New bonds are issued at higher rates making older lower-rate bonds less attractive to investors.' },
+  { level: '🔴 Hard', question: 'What does a yield curve inversion typically signal?', options: ['A — Strong economic growth ahead', 'B — Potential recession ahead', 'C — High inflation incoming', 'D — Time to Google this'], answer: 'B', explanation: 'A yield curve inversion happens when short-term bond yields exceed long-term yields. Historically this has been one of the most reliable indicators of a coming recession.' },
+  { level: '🟢 Easy', question: 'What does GDP stand for?', options: ['A — Global Development Plan', 'B — Gross Domestic Product', 'C — General Dollar Price', 'D — I know this one... maybe'], answer: 'B', explanation: 'GDP stands for Gross Domestic Product. It measures the total value of all goods and services produced in a country and is the primary measure of economic health.' },
+  { level: '🟡 Medium', question: 'What does CPI measure?', options: ['A — Corporate Profit Index', 'B — Consumer Price Index that tracks inflation', 'C — Central Policy Interest rate', 'D — No clue'], answer: 'B', explanation: 'CPI stands for Consumer Price Index. It tracks the average change in prices paid by consumers for goods and services. Central banks use it to measure inflation.' },
+  { level: '🔴 Hard', question: 'What is quantitative easing?', options: ['A — A central bank selling bonds to reduce money supply', 'B — A central bank buying bonds to inject money into the economy', 'C — A government raising taxes to control inflation', 'D — A way to make economics easier to understand'], answer: 'B', explanation: 'Quantitative easing is when a central bank purchases bonds to inject money into the economy. It is used to stimulate growth when interest rates are already near zero.' },
+  { level: '🟢 Easy', question: 'What does a bear market mean?', options: ['A — Markets are rising strongly', 'B — Markets have fallen 20% or more from recent highs', 'C — A market dominated by animal stocks', 'D — When traders are in a bad mood'], answer: 'B', explanation: 'A bear market is defined as a decline of 20% or more from recent highs in a market index. It reflects widespread pessimism and negative investor sentiment.' },
+  { level: '🟡 Medium', question: 'What is the main purpose of the Federal Reserve?', options: ['A — To print money for the US government', 'B — To manage monetary policy and maintain economic stability', 'C — To regulate Wall Street banks only', 'D — To decide stock prices'], answer: 'B', explanation: 'The Federal Reserve is the US central bank. Its main goals are to promote maximum employment, stable prices and moderate long-term interest rates through monetary policy.' }
 ];
 
 let currentMCQIndex = 0;
@@ -270,37 +217,31 @@ const scheduleText =
 ━━━━━━━━━━━━━━━━━━━━━
 🌅 *MORNING*
 ━━━━━━━━━━━━━━━━━━━━━
-☀️  8:00am — Morning Briefing
-         AI summary of overnight news
-         + Morning Edition PDF Magazine
-
+☀️  8:00am — Morning Briefing + PDF Magazine
 🗳️  9:00am — Daily Poll
-         Market sentiment question
-
 🧠 10:00am — Daily MCQ Quiz
-         Test your market knowledge
-
 ✅ 11:00am — MCQ Answer Revealed
-         With full explanation
 
 ━━━━━━━━━━━━━━━━━━━━━
-🌆 *EVENING*
+🌆 *AFTERNOON & EVENING*
 ━━━━━━━━━━━━━━━━━━━━━
-📰  6:00pm — Evening News Update
-         Top 15 headlines of the day
-         + Evening Edition PDF Magazine
+📰 12:00pm — News Update
+📰  2:00pm — News Update
+📰  4:00pm — News Update
+🌆  6:00pm — Evening News + PDF Magazine
+📰  8:00pm — News Update
+📰 10:00pm — News Update
 
 ━━━━━━━━━━━━━━━━━━━━━
-🔄 *THROUGHOUT THE DAY*
+🌙 *LATE NIGHT*
 ━━━━━━━━━━━━━━━━━━━━━
-🔔  Every Hour — Live News Update
-         Top 15 latest headlines
+📰 12:00am — News Update
+📰  2:00am — News Update
 
 ━━━━━━━━━━━━━━━━━━━━━
 💬 *EVERY MONDAY*
 ━━━━━━━━━━━━━━━━━━━━━
-💡  Weekly Big Question
-         Drop your thoughts and debate!
+💡  Weekly Big Question at 9:00am
 
 ━━━━━━━━━━━━━━━━━━━━━
 _BUILT BY MIN_ ⚡`;
@@ -454,7 +395,6 @@ bot.onText(/\/ask (.+)/, async (msg, match) => {
   }
 });
 
-// Plain text and group mention handler
 bot.on('message', async (msg) => {
   const text = msg.text;
   if (!text) return;
@@ -478,10 +418,12 @@ bot.on('message', async (msg) => {
   }
 });
 
-// ─── SCHEDULED TASKS (SGT = UTC+8) ───────────────────────────────
+// ─── SCHEDULED TASKS — ALL TIMES IN SINGAPORE TIME (SGT) ─────────
 
-// Morning briefing + PDF at 8am SGT (0am UTC)
-cron.schedule('0 0 * * *', async () => {
+const cronOpts = { timezone: TZ };
+
+// 8:00am SGT — Morning briefing + PDF
+cron.schedule('0 8 * * *', async () => {
   try {
     const markets = await fetchNews('markets', 10);
     const world = await fetchNews('world', 10);
@@ -489,115 +431,79 @@ cron.schedule('0 0 * * *', async () => {
     const allArticles = [...markets, ...world, ...tech].slice(0, 15);
     const allNews = allArticles.map(a => a.title).join('\n');
     const summary = await askGroq('Give me a short friendly morning briefing. Simple, clear and easy to understand.', allNews);
-
-    await bot.sendMessage(CHAT_ID,
-      `☀️ *Good Morning! Your Daily Briefing*\n\n${summary}\n\n_BUILT BY MIN_ ⚡`,
-      { parse_mode: 'Markdown' }
-    );
-
+    await bot.sendMessage(CHAT_ID, `☀️ *Good Morning! Your Daily Briefing*\n\n${summary}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
     const pdfPath = await generateNewsPDF(allArticles, 'Morning Edition');
-    await bot.sendDocument(CHAT_ID, pdfPath, {
-      caption: `📰 *Nomo News — Morning Edition*\n\n_BUILT BY MIN_ ⚡`,
-      parse_mode: 'Markdown'
-    });
+    await bot.sendDocument(CHAT_ID, pdfPath, { caption: `📰 *Nomo News — Morning Edition*\n\n_BUILT BY MIN_ ⚡`, parse_mode: 'Markdown' });
     fs.unlinkSync(pdfPath);
   } catch (err) {
     console.error('Morning briefing error:', err.message);
   }
-});
+}, cronOpts);
 
-// Daily poll at 9am SGT (1am UTC)
-cron.schedule('0 1 * * *', async () => {
+// 9:00am SGT — Daily poll (+ weekly question on Mondays)
+cron.schedule('0 9 * * *', async () => {
   try {
-    const day = new Date().getDay();
-    const poll = dailyPolls[day];
+    const day = new Date().toLocaleString('en-US', { weekday: 'short', timeZone: TZ });
+    const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const d = dayMap[day];
+    const poll = dailyPolls[d];
     await bot.sendPoll(CHAT_ID, poll.question, poll.options, { is_anonymous: false });
-
-    if (day === 1) {
+    if (d === 1) {
       const weekNum = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % weeklyQuestions.length;
       bot.sendMessage(CHAT_ID, weeklyQuestions[weekNum] + '\n\n_Drop your thoughts below — all views welcome!_ 👇', { parse_mode: 'Markdown' });
     }
   } catch (err) {
     console.error('Daily poll error:', err.message);
   }
-});
+}, cronOpts);
 
-// MCQ quiz at 10am SGT (2am UTC)
-cron.schedule('0 2 * * *', async () => {
+// 10:00am SGT — MCQ quiz
+cron.schedule('0 10 * * *', async () => {
   try {
     currentMCQ = mcqQuestions[currentMCQIndex % mcqQuestions.length];
     currentMCQIndex++;
-    const text =
-      `🧠 *Daily Market Quiz!* ${currentMCQ.level}\n\n` +
-      `*${currentMCQ.question}*\n\n` +
-      currentMCQ.options.join('\n') +
-      `\n\n_Reply with your answer! Correct answer revealed at 11am_ ⏰`;
+    const text = `🧠 *Daily Market Quiz!* ${currentMCQ.level}\n\n*${currentMCQ.question}*\n\n` + currentMCQ.options.join('\n') + `\n\n_Reply with your answer! Correct answer revealed at 11am_ ⏰`;
     bot.sendMessage(CHAT_ID, text, { parse_mode: 'Markdown' });
   } catch (err) {
     console.error('MCQ error:', err.message);
   }
-});
+}, cronOpts);
 
-// MCQ answer at 11am SGT (3am UTC)
-cron.schedule('0 3 * * *', async () => {
+// 11:00am SGT — MCQ answer
+cron.schedule('0 11 * * *', async () => {
   try {
     if (!currentMCQ) return;
-    const text =
-      `✅ *MCQ Answer Revealed!*\n\n` +
-      `*Question:* ${currentMCQ.question}\n\n` +
-      `*Correct Answer: ${currentMCQ.answer}*\n\n` +
-      `📖 *Explanation:*\n${currentMCQ.explanation}\n\n` +
-      `_BUILT BY MIN_ ⚡`;
+    const text = `✅ *MCQ Answer Revealed!*\n\n*Question:* ${currentMCQ.question}\n\n*Correct Answer: ${currentMCQ.answer}*\n\n📖 *Explanation:*\n${currentMCQ.explanation}\n\n_BUILT BY MIN_ ⚡`;
     bot.sendMessage(CHAT_ID, text, { parse_mode: 'Markdown' });
   } catch (err) {
     console.error('MCQ answer error:', err.message);
   }
-});
+}, cronOpts);
 
-// Evening news + PDF at 6pm SGT (10am UTC)
-cron.schedule('0 10 * * *', async () => {
+// 6:00pm SGT — Evening news + PDF
+cron.schedule('0 18 * * *', async () => {
   try {
     const markets = await fetchNews('markets', 10);
     const world = await fetchNews('world', 10);
     const tech = await fetchNews('technology', 10);
     const allArticles = [...markets, ...world, ...tech].slice(0, 15);
-    const newsText = allArticles.map((a, i) =>
-      `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
-    ).join('\n\n');
-
-    await bot.sendMessage(CHAT_ID,
-      `🌆 *Evening News Update*\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`,
-      { parse_mode: 'Markdown' }
-    );
-
+    const newsText = allArticles.map((a, i) => `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`).join('\n\n');
+    await bot.sendMessage(CHAT_ID, `🌆 *Evening News Update*\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
     const pdfPath = await generateNewsPDF(allArticles, 'Evening Edition');
-    await bot.sendDocument(CHAT_ID, pdfPath, {
-      caption: `📰 *Nomo News — Evening Edition*\n\n_BUILT BY MIN_ ⚡`,
-      parse_mode: 'Markdown'
-    });
+    await bot.sendDocument(CHAT_ID, pdfPath, { caption: `📰 *Nomo News — Evening Edition*\n\n_BUILT BY MIN_ ⚡`, parse_mode: 'Markdown' });
     fs.unlinkSync(pdfPath);
   } catch (err) {
     console.error('Evening news error:', err.message);
   }
-});
+}, cronOpts);
 
-// Hourly news update
-cron.schedule('0 * * * *', async () => {
-  try {
-    const markets = await fetchNews('markets', 10);
-    const world = await fetchNews('world', 10);
-    const tech = await fetchNews('technology', 10);
-    const topNews = [...markets, ...world, ...tech].slice(0, 15);
-    const newsText = topNews.map((a, i) =>
-      `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
-    ).join('\n\n');
-    bot.sendMessage(CHAT_ID,
-      `🔔 *Hourly News Update*\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`,
-      { parse_mode: 'Markdown' }
-    );
-  } catch (err) {
-    console.error('Hourly update error:', err.message);
-  }
-});
+// News updates at fixed SGT times: 12pm, 2pm, 4pm, 8pm, 10pm, 12am, 2am
+cron.schedule('0 12 * * *', () => postNewsUpdate('🔔 *News Update — 12pm*').catch(e => console.error(e.message)), cronOpts);
+cron.schedule('0 14 * * *', () => postNewsUpdate('🔔 *News Update — 2pm*').catch(e => console.error(e.message)), cronOpts);
+cron.schedule('0 16 * * *', () => postNewsUpdate('🔔 *News Update — 4pm*').catch(e => console.error(e.message)), cronOpts);
+cron.schedule('0 20 * * *', () => postNewsUpdate('🔔 *News Update — 8pm*').catch(e => console.error(e.message)), cronOpts);
+cron.schedule('0 22 * * *', () => postNewsUpdate('🔔 *News Update — 10pm*').catch(e => console.error(e.message)), cronOpts);
+cron.schedule('0 0 * * *', () => postNewsUpdate('🔔 *News Update — 12am*').catch(e => console.error(e.message)), cronOpts);
+cron.schedule('0 2 * * *', () => postNewsUpdate('🔔 *News Update — 2am*').catch(e => console.error(e.message)), cronOpts);
 
-console.log('Nomo News Bot is running - BUILT BY MIN');
+console.log('Nomo News Bot is running - BUILT BY MIN - all times SGT');
