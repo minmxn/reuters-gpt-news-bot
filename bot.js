@@ -41,6 +41,23 @@ async function fetchNewsByCountry(country, pageSize = 5) {
   return response.data.articles;
 }
 
+// ─── COMBINED NEWS FETCH (1 API call instead of 3) ───────────────
+// Used by all scheduled posts to stay within the 100 calls/day free tier limit.
+// Replaces the old pattern of fetchNews('markets') + fetchNews('world') + fetchNews('technology').
+
+async function fetchCombinedNews(pageSize = 15) {
+  const response = await axios.get('https://newsapi.org/v2/everything', {
+    params: {
+      q: 'stock market OR geopolitics OR artificial intelligence OR economy',
+      language: 'en',
+      sortBy: 'publishedAt',
+      pageSize,
+      apiKey: NEWS_API_KEY
+    }
+  });
+  return response.data.articles;
+}
+
 // ─── GROQ AI ──────────────────────────────────────────────────────
 
 async function askGroq(question, newsContext = '') {
@@ -140,11 +157,10 @@ function cleanMessage(text) {
   return text.replace(`@${BOT_USERNAME}`, '').trim();
 }
 
+// ─── NEWS UPDATE HELPER (now uses fetchCombinedNews — 1 call only) ─
+
 async function postNewsUpdate(label) {
-  const markets = await fetchNews('markets', 10);
-  const world = await fetchNews('world', 10);
-  const tech = await fetchNews('technology', 10);
-  const topNews = [...markets, ...world, ...tech].slice(0, 15);
+  const topNews = await fetchCombinedNews(15);
   const newsText = topNews.map((a, i) =>
     `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
   ).join('\n\n');
@@ -199,7 +215,7 @@ const mcqQuestions = [
   { level: '🟡 Medium', question: 'When the Fed raises interest rates, what typically happens to bond prices?', options: ['A — They go up', 'B — They go down', 'C — They stay the same', 'D — What is a bond?'], answer: 'B', explanation: 'When interest rates rise, existing bond prices fall. New bonds are issued at higher rates making older lower-rate bonds less attractive to investors.' },
   { level: '🔴 Hard', question: 'What does a yield curve inversion typically signal?', options: ['A — Strong economic growth ahead', 'B — Potential recession ahead', 'C — High inflation incoming', 'D — Time to Google this'], answer: 'B', explanation: 'A yield curve inversion happens when short-term bond yields exceed long-term yields. Historically this has been one of the most reliable indicators of a coming recession.' },
   { level: '🟢 Easy', question: 'What does GDP stand for?', options: ['A — Global Development Plan', 'B — Gross Domestic Product', 'C — General Dollar Price', 'D — I know this one... maybe'], answer: 'B', explanation: 'GDP stands for Gross Domestic Product. It measures the total value of all goods and services produced in a country and is the primary measure of economic health.' },
-  { level: '🟡 Medium', question: 'What does CPI measure?', options: ['A — Corporate Profit Index', 'B — Consumer Price Index that tracks inflation', 'C — Central Policy Interest rate', 'D — No clue'], answer: 'B', explanation: 'CPI stands for Consumer Price Index. It tracks the average change in prices paid by consumers for goods and services. Central banks use it to measure inflation.' },
+  { level: '🟡 Medium', question: 'What does CPI measure?', options: ['A — Corporate Price Index', 'B — Consumer Price Index that tracks inflation', 'C — Central Policy Interest rate', 'D — No clue'], answer: 'B', explanation: 'CPI stands for Consumer Price Index. It tracks the average change in prices paid by consumers for goods and services. Central banks use it to measure inflation.' },
   { level: '🔴 Hard', question: 'What is quantitative easing?', options: ['A — A central bank selling bonds to reduce money supply', 'B — A central bank buying bonds to inject money into the economy', 'C — A government raising taxes to control inflation', 'D — A way to make economics easier to understand'], answer: 'B', explanation: 'Quantitative easing is when a central bank purchases bonds to inject money into the economy. It is used to stimulate growth when interest rates are already near zero.' },
   { level: '🟢 Easy', question: 'What does a bear market mean?', options: ['A — Markets are rising strongly', 'B — Markets have fallen 20% or more from recent highs', 'C — A market dominated by animal stocks', 'D — When traders are in a bad mood'], answer: 'B', explanation: 'A bear market is defined as a decline of 20% or more from recent highs in a market index. It reflects widespread pessimism and negative investor sentiment.' },
   { level: '🟡 Medium', question: 'What is the main purpose of the Federal Reserve?', options: ['A — To print money for the US government', 'B — To manage monetary policy and maintain economic stability', 'C — To regulate Wall Street banks only', 'D — To decide stock prices'], answer: 'B', explanation: 'The Federal Reserve is the US central bank. Its main goals are to promote maximum employment, stable prices and moderate long-term interest rates through monetary policy.' }
@@ -296,9 +312,8 @@ bot.onText(/\/briefing|☀️ Briefing/, async (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, '☀️ Hang tight — putting together your briefing...');
   try {
-    const markets = await fetchNews('markets');
-    const world = await fetchNews('world');
-    const allNews = [...markets, ...world].map(a => a.title).join('\n');
+    const articles = await fetchCombinedNews(15);
+    const allNews = articles.map(a => a.title).join('\n');
     const summary = await askGroq('Give me a short news briefing based on these headlines. Keep it friendly, simple and easy to understand.', allNews);
     bot.sendMessage(chatId, `☀️ *Your Daily Briefing*\n\n${summary}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
   } catch (err) {
@@ -385,10 +400,7 @@ bot.onText(/\/testpdf/, async (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, '📰 Generating a test PDF magazine...');
   try {
-    const markets = await fetchNews('markets', 10);
-    const world = await fetchNews('world', 10);
-    const tech = await fetchNews('technology', 10);
-    const allArticles = [...markets, ...world, ...tech].slice(0, 15);
+    const allArticles = await fetchCombinedNews(15);
     const pdfPath = await generateNewsPDF(allArticles, 'Test Edition');
     await bot.sendDocument(chatId, pdfPath, { caption: `📰 *Nomo News — Test Edition*\n\n_BUILT BY MIN_ ⚡`, parse_mode: 'Markdown' });
     fs.unlinkSync(pdfPath);
@@ -421,16 +433,20 @@ bot.on('message', async (msg) => {
 });
 
 // ─── SCHEDULED TASKS — ALL TIMES IN SINGAPORE TIME (SGT) ─────────
+// API call budget per day (100 limit on free tier):
+//   8am briefing:    1 (fetchCombinedNews)
+//   6pm evening:     1 (fetchCombinedNews)
+//   7x news updates: 1 each = 7 (fetchCombinedNews)
+//   /testpdf:        1 (fetchCombinedNews)
+//   Total scheduled: ~9/day — leaves ~90 calls for user commands
+// ─────────────────────────────────────────────────────────────────
 
 const cronOpts = { timezone: TZ };
 
 // 8:00am SGT — Morning briefing + PDF
 cron.schedule('0 8 * * *', async () => {
   try {
-    const markets = await fetchNews('markets', 10);
-    const world = await fetchNews('world', 10);
-    const tech = await fetchNews('technology', 10);
-    const allArticles = [...markets, ...world, ...tech].slice(0, 15);
+    const allArticles = await fetchCombinedNews(15);
     const allNews = allArticles.map(a => a.title).join('\n');
     const summary = await askGroq('Give me a short friendly morning briefing. Simple, clear and easy to understand.', allNews);
     await bot.sendMessage(CHAT_ID, `☀️ *Good Morning! Your Daily Briefing*\n\n${summary}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
@@ -485,10 +501,7 @@ cron.schedule('0 11 * * *', async () => {
 // 6:00pm SGT — Evening news + PDF
 cron.schedule('0 18 * * *', async () => {
   try {
-    const markets = await fetchNews('markets', 10);
-    const world = await fetchNews('world', 10);
-    const tech = await fetchNews('technology', 10);
-    const allArticles = [...markets, ...world, ...tech].slice(0, 15);
+    const allArticles = await fetchCombinedNews(15);
     const newsText = allArticles.map((a, i) => `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`).join('\n\n');
     await bot.sendMessage(CHAT_ID, `🌆 *Evening News Update*\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
     const pdfPath = await generateNewsPDF(allArticles, 'Evening Edition');
