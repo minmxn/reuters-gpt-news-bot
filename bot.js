@@ -521,4 +521,4 @@ cron.schedule('0 22 * * *', () => postNewsUpdate('🔔 *News Update — 10pm*').
 cron.schedule('0 0 * * *', () => postNewsUpdate('🔔 *News Update — 12am*').catch(e => console.error(e.message)), cronOpts);
 cron.schedule('0 2 * * *', () => postNewsUpdate('🔔 *News Update — 2am*').catch(e => console.error(e.message)), cronOpts);
 
-console.log('Nomo News Bot is running - BUILT BY MIN - all times SGT');
+console.log('Nomo News Bot is running - BUILT BY MIN - all times SGT v2');
