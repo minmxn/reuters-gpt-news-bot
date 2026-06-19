@@ -49,7 +49,6 @@ const scheduleText =
 🌙 *LATE NIGHT*
 ━━━━━━━━━━━━━━━━━━━━━
 📰 12:00am — News Update
-📰  2:00am — News Update
 
 ━━━━━━━━━━━━━━━━━━━━━
 💬 *EVERY MONDAY*
@@ -97,9 +96,9 @@ function registerScheduler(bot) {
   //   9am poll:        1 (fetchCombinedNews — for AI poll context)
   //   10am MCQ:        1 (fetchCombinedNews — for AI quiz context)
   //   6pm evening:     1 (fetchCombinedNews)
-  //   7x news updates: 1 each = 7 (fetchCombinedNews)
+  //   6x news updates: 1 each = 6 (fetchCombinedNews)
   //   /testpdf:        1 (fetchCombinedNews)
-  //   Total scheduled: ~11/day — leaves ~89 calls for user commands
+  //   Total scheduled: ~10/day — leaves ~90 calls for user commands
 
   // 8:00am SGT — Morning briefing + PDF
   cron.schedule('0 8 * * *', async () => {
@@ -197,14 +196,13 @@ function registerScheduler(bot) {
     }
   }, cronOpts);
 
-  // News updates at fixed SGT times: 12pm, 2pm, 4pm, 8pm, 10pm, 12am, 2am
+  // News updates at fixed SGT times: 12pm, 2pm, 4pm, 8pm, 10pm, 12am
   cron.schedule('0 12 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 12pm*').catch(e => console.error(e.message)), cronOpts);
   cron.schedule('0 14 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 2pm*').catch(e => console.error(e.message)), cronOpts);
   cron.schedule('0 16 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 4pm*').catch(e => console.error(e.message)), cronOpts);
   cron.schedule('0 20 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 8pm*').catch(e => console.error(e.message)), cronOpts);
   cron.schedule('0 22 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 10pm*').catch(e => console.error(e.message)), cronOpts);
   cron.schedule('0 0 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 12am*').catch(e => console.error(e.message)), cronOpts);
-  cron.schedule('0 2 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 2am*').catch(e => console.error(e.message)), cronOpts);
 }
 
 module.exports = { registerScheduler, mainKeyboard, scheduleText };

@@ -90,4 +90,3 @@ nomo-news-bot/
 | 8:00pm | News Update |
 | 10:00pm | News Update |
 | 12:00am | News Update |
-| 2:00am | News Update |
