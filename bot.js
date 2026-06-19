@@ -138,12 +138,30 @@ function generateNewsPDF(articles, edition) {
 
 // ─── HELPERS ──────────────────────────────────────────────────────
 
+// Escapes Telegram Markdown special characters so stray symbols in
+// article titles/descriptions don't break message parsing.
+function escapeMarkdown(text) {
+  if (!text) return '';
+  return text.replace(/([_*\[\]`])/g, '\\$1');
+}
+
+// Truncates text to a max length and adds an ellipsis.
+function truncate(text, max = 100) {
+  if (!text) return '';
+  return text.length > max ? text.substring(0, max).trim() + '...' : text;
+}
+
+// Builds the article list: limited count, truncated descriptions,
+// and Markdown-safe text. Keeps messages under Telegram's 4096 char limit.
+function buildNewsBody(articles, max = 10) {
+  return articles.slice(0, max).map((a, i) =>
+    `*${i + 1}. ${escapeMarkdown(a.title)}*\n${escapeMarkdown(truncate(a.description, 100))}\n[Read more](${a.url})`
+  ).join('\n\n');
+}
+
 function formatNews(articles, label) {
   if (!articles || articles.length === 0) return 'No news found right now. Try again later!';
-  const body = articles.map((a, i) =>
-    `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
-  ).join('\n\n');
-  return `📰 *${label}*\n\n${body}`;
+  return `📰 *${escapeMarkdown(label)}*\n\n${buildNewsBody(articles, 10)}`;
 }
 
 function shouldRespond(msg) {
@@ -161,9 +179,7 @@ function cleanMessage(text) {
 
 async function postNewsUpdate(label) {
   const topNews = await fetchCombinedNews(15);
-  const newsText = topNews.map((a, i) =>
-    `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`
-  ).join('\n\n');
+  const newsText = buildNewsBody(topNews, 10);
   await bot.sendMessage(CHAT_ID,
     `${label}\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`,
     { parse_mode: 'Markdown' }
@@ -502,7 +518,7 @@ cron.schedule('0 11 * * *', async () => {
 cron.schedule('0 18 * * *', async () => {
   try {
     const allArticles = await fetchCombinedNews(15);
-    const newsText = allArticles.map((a, i) => `*${i + 1}. ${a.title}*\n${a.description || ''}\n[Read more](${a.url})`).join('\n\n');
+    const newsText = buildNewsBody(allArticles, 10);
     await bot.sendMessage(CHAT_ID, `🌆 *Evening News Update*\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
     const pdfPath = await generateNewsPDF(allArticles, 'Evening Edition');
     await bot.sendDocument(CHAT_ID, pdfPath, { caption: `📰 *Nomo News — Evening Edition*\n\n_BUILT BY MIN_ ⚡`, parse_mode: 'Markdown' });
