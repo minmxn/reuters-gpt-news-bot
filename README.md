@@ -1,1 +1,1 @@
-# reuters-gpt-news-bot
+# nomo-news-bot
