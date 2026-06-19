@@ -13,10 +13,22 @@ function truncate(text, max = 100) {
   return text.length > max ? text.substring(0, max).trim() + '...' : text;
 }
 
+const BLOCKED_DOMAINS = [
+  'biztoc.com',   // scraper aggregator
+  'alltoc.com',   // redirect aggregator
+  'medium.com',   // blog platform, inconsistent quality
+];
+
+function isCleanUrl(url) {
+  try { return !BLOCKED_DOMAINS.some(d => new URL(url).hostname.includes(d)); }
+  catch { return false; }
+}
+
 // Builds the article list: limited count, truncated descriptions,
 // and Markdown-safe text. Keeps messages under Telegram's 4096 char limit.
 function buildNewsBody(articles, max = 10) {
-  return articles.slice(0, max).map((a, i) =>
+  const clean = articles.filter(a => isCleanUrl(a.url));
+  return clean.slice(0, max).map((a, i) =>
     `*${i + 1}. ${escapeMarkdown(a.title)}*\n${escapeMarkdown(truncate(a.description, 100))}\n[Read more](${a.url})`
   ).join('\n\n');
 }
