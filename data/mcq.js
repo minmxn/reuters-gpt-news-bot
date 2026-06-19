@@ -9,10 +9,12 @@ const mcqQuestions = [
   { level: '🟡 Medium', question: 'What is the main purpose of the Federal Reserve?', options: ['A — To print money for the US government', 'B — To manage monetary policy and maintain economic stability', 'C — To regulate Wall Street banks only', 'D — To decide stock prices'], answer: 'B', explanation: 'The Federal Reserve is the US central bank. Its main goals are to promote maximum employment, stable prices and moderate long-term interest rates through monetary policy.' }
 ];
 
-// Mutable state shared between commands and scheduler
+// Mutable state shared between commands and scheduler.
+// currentMCQs holds the three questions (Easy/Medium/Hard) posted at 10am
+// so the 11am job can reveal their answers.
 const mcqState = {
   currentMCQIndex: 0,
-  currentMCQ: null
+  currentMCQs: []
 };
 
 module.exports = { mcqQuestions, mcqState };

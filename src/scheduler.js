@@ -2,7 +2,7 @@ const fs = require('fs');
 const cron = require('node-cron');
 const { TZ, CHAT_ID } = require('../config');
 const { fetchCombinedNews } = require('./news');
-const { askGroq } = require('./groq');
+const { askGroq, generateMCQSet, generatePoll } = require('./groq');
 const { generateNewsPDF } = require('./pdf');
 const { buildNewsBody } = require('./helpers');
 const { dailyPolls, weeklyQuestions } = require('../data/polls');
@@ -59,6 +59,23 @@ const scheduleText =
 ━━━━━━━━━━━━━━━━━━━━━
 _BUILT BY MIN_ ⚡`;
 
+// ─── MCQ FALLBACK ─────────────────────────────────────────────────
+// Picks one Easy, one Medium and one Hard question from the hardcoded
+// set, rotating through them so the same trio isn't repeated daily.
+
+function fallbackMCQSet() {
+  const pick = (level, offset) => {
+    const pool = mcqQuestions.filter(q => q.level === level);
+    return pool[offset % pool.length];
+  };
+  const i = mcqState.currentMCQIndex++;
+  return [
+    pick('🟢 Easy', i),
+    pick('🟡 Medium', i),
+    pick('🔴 Hard', i)
+  ];
+}
+
 // ─── NEWS UPDATE HELPER (uses fetchCombinedNews — 1 call only) ────
 
 async function postNewsUpdate(bot, label) {
@@ -77,10 +94,12 @@ function registerScheduler(bot) {
 
   // API call budget per day (100 limit on free tier):
   //   8am briefing:    1 (fetchCombinedNews)
+  //   9am poll:        1 (fetchCombinedNews — for AI poll context)
+  //   10am MCQ:        1 (fetchCombinedNews — for AI quiz context)
   //   6pm evening:     1 (fetchCombinedNews)
   //   7x news updates: 1 each = 7 (fetchCombinedNews)
   //   /testpdf:        1 (fetchCombinedNews)
-  //   Total scheduled: ~9/day — leaves ~90 calls for user commands
+  //   Total scheduled: ~11/day — leaves ~89 calls for user commands
 
   // 8:00am SGT — Morning briefing + PDF
   cron.schedule('0 8 * * *', async () => {
@@ -98,12 +117,24 @@ function registerScheduler(bot) {
   }, cronOpts);
 
   // 9:00am SGT — Daily poll (+ weekly question on Mondays)
+  // Tries to generate a fresh poll from today's headlines via Groq;
+  // falls back silently to the hardcoded daily poll if Groq is down/slow.
   cron.schedule('0 9 * * *', async () => {
     try {
       const day = new Date().toLocaleString('en-US', { weekday: 'short', timeZone: TZ });
       const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
       const d = dayMap[day];
-      const poll = dailyPolls[d];
+
+      let poll;
+      try {
+        const articles = await fetchCombinedNews(15);
+        const headlines = articles.map(a => a.title).join('\n');
+        poll = await generatePoll(headlines);
+      } catch (genErr) {
+        console.error('AI poll generation failed, using fallback:', genErr.message);
+        poll = dailyPolls[d];
+      }
+
       await bot.sendPoll(CHAT_ID, poll.question, poll.options, { is_anonymous: false });
       if (d === 1) {
         const weekNum = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % weeklyQuestions.length;
@@ -114,23 +145,38 @@ function registerScheduler(bot) {
     }
   }, cronOpts);
 
-  // 10:00am SGT — MCQ quiz
+  // 10:00am SGT — MCQ quiz (3 questions: Easy, Medium, Hard)
+  // Tries to generate a fresh set from today's headlines via Groq;
+  // falls back silently to hardcoded questions if Groq is down/slow.
   cron.schedule('0 10 * * *', async () => {
     try {
-      mcqState.currentMCQ = mcqQuestions[mcqState.currentMCQIndex % mcqQuestions.length];
-      mcqState.currentMCQIndex++;
-      const text = `🧠 *Daily Market Quiz!* ${mcqState.currentMCQ.level}\n\n*${mcqState.currentMCQ.question}*\n\n` + mcqState.currentMCQ.options.join('\n') + `\n\n_Reply with your answer! Correct answer revealed at 11am_ ⏰`;
+      try {
+        const articles = await fetchCombinedNews(15);
+        const headlines = articles.map(a => a.title).join('\n');
+        mcqState.currentMCQs = await generateMCQSet(headlines);
+      } catch (genErr) {
+        console.error('AI MCQ generation failed, using fallback:', genErr.message);
+        mcqState.currentMCQs = fallbackMCQSet();
+      }
+
+      const body = mcqState.currentMCQs.map((q, i) =>
+        `${q.level}\n*Q${i + 1}: ${q.question}*\n${q.options.join('\n')}`
+      ).join('\n\n');
+      const text = `🧠 *Daily Market Quiz!* — 3 Questions\n\n${body}\n\n_Reply with your answers! Revealed at 11am_ ⏰`;
       bot.sendMessage(CHAT_ID, text, { parse_mode: 'Markdown' });
     } catch (err) {
       console.error('MCQ error:', err.message);
     }
   }, cronOpts);
 
-  // 11:00am SGT — MCQ answer
+  // 11:00am SGT — MCQ answers
   cron.schedule('0 11 * * *', async () => {
     try {
-      if (!mcqState.currentMCQ) return;
-      const text = `✅ *MCQ Answer Revealed!*\n\n*Question:* ${mcqState.currentMCQ.question}\n\n*Correct Answer: ${mcqState.currentMCQ.answer}*\n\n📖 *Explanation:*\n${mcqState.currentMCQ.explanation}\n\n_BUILT BY MIN_ ⚡`;
+      if (!mcqState.currentMCQs || mcqState.currentMCQs.length === 0) return;
+      const body = mcqState.currentMCQs.map((q, i) =>
+        `${q.level}\n*Q${i + 1}: ${q.question}*\n*Correct Answer: ${q.answer}*\n📖 ${q.explanation}`
+      ).join('\n\n');
+      const text = `✅ *MCQ Answers Revealed!*\n\n${body}\n\n_BUILT BY MIN_ ⚡`;
       bot.sendMessage(CHAT_ID, text, { parse_mode: 'Markdown' });
     } catch (err) {
       console.error('MCQ answer error:', err.message);
