@@ -126,6 +126,7 @@ function extractFileId(msg) {
 
 // opts.articles — pre-fetched articles to reuse (skips a NewsAPI call)
 // opts.silent   — skip the "Loading…" message (used for scheduled posts)
+// opts.sortBy   — NewsAPI sort when fetching ('publishedAt' for newest)
 async function startReader(bot, chatId, opts = {}) {
   pruneSessions();
   const loading = opts.silent ? null : await bot.sendMessage(chatId, '📖 Loading your news reader...');
@@ -134,7 +135,7 @@ async function startReader(bot, chatId, opts = {}) {
     else await bot.sendMessage(chatId, text).catch(() => {});
   };
   try {
-    const articles = (opts.articles || await fetchCombinedNews(STORY_COUNT)).slice(0, STORY_COUNT);
+    const articles = (opts.articles || await fetchCombinedNews(STORY_COUNT, opts.sortBy)).slice(0, STORY_COUNT);
     if (articles.length === 0) {
       await fail('😬 No news available right now. Try again later!');
       return;

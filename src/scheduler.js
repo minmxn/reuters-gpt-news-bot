@@ -74,7 +74,8 @@ function fallbackMCQSet() {
 
 async function postNewsUpdate(bot, label) {
   await bot.sendMessage(CHAT_ID, `${label}\n\n_Tap through the latest stories_ 👇`, { parse_mode: 'Markdown' });
-  await startReader(bot, CHAT_ID, { silent: true });
+  // Timed updates show the newest stories, not the most "significant" ones.
+  await startReader(bot, CHAT_ID, { silent: true, sortBy: 'publishedAt' });
 }
 
 // ─── SCHEDULER ────────────────────────────────────────────────────

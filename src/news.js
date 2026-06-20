@@ -71,14 +71,16 @@ async function fetchNewsByCountry(country, pageSize = 5) {
 // Used by all scheduled posts to stay within the 100 calls/day free tier limit.
 // Replaces the old pattern of fetchNews('markets') + fetchNews('world') + fetchNews('technology').
 // Fetches extra so enough remain after blocked-domain filtering.
-async function fetchCombinedNews(pageSize = 15) {
+// sortBy: 'popularity' (default — lead with significant stories from major
+// outlets) or 'publishedAt' (newest first, used by the timed news updates).
+async function fetchCombinedNews(pageSize = 15, sortBy = 'popularity') {
   trackApiCall();
   const response = await axios.get('https://newsapi.org/v2/everything', {
     params: {
       q: 'stock market OR geopolitics OR artificial intelligence OR economy',
       domains: TRUSTED_SOURCES,
       language: 'en',
-      sortBy: 'popularity', // lead with significant stories from major outlets, not just newest
+      sortBy,
       pageSize: Math.min(pageSize + 10, 100),
       apiKey: NEWS_API_KEY
     }
