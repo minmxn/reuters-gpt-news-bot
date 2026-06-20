@@ -4,7 +4,7 @@ const { fetchCombinedNews } = require('./news');
 const { askGroq, generateMCQSet, generatePoll } = require('./groq');
 const { startReader } = require('./reader');
 const { sendTopStoriesTeaser } = require('./teaser');
-const { dailyPolls, weeklyQuestions } = require('../data/polls');
+const { dailyPolls } = require('../data/polls');
 const { mcqQuestions, mcqState } = require('../data/mcq');
 
 // ─── KEYBOARD ─────────────────────────────────────────────────────
@@ -42,11 +42,6 @@ const scheduleText =
 🌆  6:00pm — Evening Top News
 📖  8:00pm — News Reader
 📖 10:00pm — News Reader
-
-━━━━━━━━━━━━━━━━━━━━━
-💬 *EVERY MONDAY*
-━━━━━━━━━━━━━━━━━━━━━
-💡  Weekly Big Question at 9:00am
 
 ━━━━━━━━━━━━━━━━━━━━━
 _BUILT BY MIN_ ⚡`;
@@ -122,10 +117,6 @@ function registerScheduler(bot) {
       }
 
       await bot.sendPoll(CHAT_ID, poll.question, poll.options, { is_anonymous: false });
-      if (d === 1) {
-        const weekNum = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % weeklyQuestions.length;
-        bot.sendMessage(CHAT_ID, weeklyQuestions[weekNum] + '\n\n_Drop your thoughts below — all views welcome!_ 👇', { parse_mode: 'Markdown' });
-      }
     } catch (err) {
       console.error('Daily poll error:', err.message);
     }

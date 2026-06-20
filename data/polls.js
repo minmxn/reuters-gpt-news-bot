@@ -8,15 +8,4 @@ const dailyPolls = {
   0: { question: '🗳️ Sunday Prediction Corner\n\nYour call for next week — S&P 500?', options: ['📈 Up more than 1%', '📈 Up less than 1%', '😐 Flat', '📉 Down less than 1%', '📉 Down more than 1%', '🤷 Markets are unpredictable'] }
 };
 
-const weeklyQuestions = [
-  '💬 *Weekly Big Question*\n\nIs the US dollar losing its dominance as the world reserve currency? Drop your thoughts below!',
-  '💬 *Weekly Big Question*\n\nWill AI stocks keep outperforming the broader market in 2026? Agree or disagree?',
-  '💬 *Weekly Big Question*\n\nIs a global recession coming in the next 12 months? What is your read?',
-  '💬 *Weekly Big Question*\n\nAre interest rates going to stay higher for longer? How is it affecting you?',
-  '💬 *Weekly Big Question*\n\nIs China a good investment opportunity right now? Bullish or bearish?',
-  '💬 *Weekly Big Question*\n\nWill crypto become a mainstream asset class in the next 5 years?',
-  '💬 *Weekly Big Question*\n\nIs Singapore economy resilient enough to weather a global slowdown?',
-  '💬 *Weekly Big Question*\n\nWith AI disrupting industries — which sector do you think is most at risk?'
-];
-
-module.exports = { dailyPolls, weeklyQuestions };
+module.exports = { dailyPolls };

@@ -65,7 +65,7 @@ bot.js
 │   └── helpers.js         escapeMarkdown, truncate, buildNewsBody, formatNews,
 │                          shouldRespond, cleanMessage
 ├── data/
-│   ├── polls.js           dailyPolls (per weekday) + weeklyQuestions
+│   ├── polls.js           dailyPolls (per weekday)
 │   └── mcq.js             mcqQuestions (hardcoded fallback) + mcqState
 └── public/
     └── index.html         Mini App — fullscreen swipeable card reader
@@ -88,7 +88,7 @@ bot.js
 | Time | Post | Source |
 |---|---|---|
 | 8:00am | Morning briefing (AI summary only) | scheduler.js |
-| 9:00am | Daily poll (+ weekly question on Mondays) — AI-generated, falls back to hardcoded | scheduler.js + data/polls.js |
+| 9:00am | Daily poll — AI-generated, falls back to hardcoded | scheduler.js + data/polls.js |
 | 10:00am | MCQ quiz (3 questions) — AI-generated, falls back to hardcoded | scheduler.js + data/mcq.js |
 | 11:00am | MCQ answers | scheduler.js |
 | 12:00pm | News reader (carousel) | scheduler.js → reader.js |

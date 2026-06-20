@@ -76,7 +76,7 @@ nomo-news-bot/
 │   ├── pdf.js          # PDF generator
 │   └── helpers.js      # Shared utilities
 └── data/
-    ├── polls.js        # Daily polls and weekly questions
+    ├── polls.js        # Daily polls (per weekday)
     └── mcq.js          # Quiz questions and state
 ```
 
@@ -85,7 +85,7 @@ nomo-news-bot/
 | Time | Post |
 |---|---|
 | 8:00am | Morning Briefing (AI summary) |
-| 9:00am | Daily Poll (+ Weekly Question on Mondays) |
+| 9:00am | Daily Poll |
 | 10:00am | MCQ Quiz |
 | 11:00am | MCQ Answer Revealed |
 | 12:00pm | News Reader (tap-through carousel) |
