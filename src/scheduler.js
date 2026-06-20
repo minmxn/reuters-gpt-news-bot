@@ -40,8 +40,7 @@ const scheduleText =
 🌆 *AFTERNOON & EVENING*
 ━━━━━━━━━━━━━━━━━━━━━
 📖 12:00pm — News Reader
-📖  2:00pm — News Reader
-📖  4:00pm — News Reader
+📖  3:00pm — News Reader
 🌆  6:00pm — Evening News + PDF Magazine
 📖  8:00pm — News Reader
 📖 10:00pm — News Reader
@@ -88,9 +87,9 @@ function registerScheduler(bot) {
   //   9am poll:           1 (fetchCombinedNews — for AI poll context)
   //   10am MCQ:           1 (fetchCombinedNews — for AI quiz context)
   //   6pm evening+PDF:    1 (fetchCombinedNews)
-  //   5x reader updates:  1 each = 5 (fetchCombinedNews via startReader)
+  //   4x reader updates:  1 each = 4 (fetchCombinedNews via startReader)
   //   /testpdf:           1 (fetchCombinedNews)
-  //   Total scheduled: ~10/day — leaves ~90 calls for user commands
+  //   Total scheduled: ~9/day — leaves ~90 calls for user commands
 
   // 8:00am SGT — Morning briefing + PDF
   cron.schedule('0 8 * * *', async () => {
@@ -188,10 +187,9 @@ function registerScheduler(bot) {
     }
   }, cronOpts);
 
-  // News updates at fixed SGT times: 12pm, 2pm, 4pm, 8pm, 10pm
+  // News updates at fixed SGT times: 12pm, 3pm, 8pm, 10pm
   cron.schedule('0 12 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 12pm*').catch(e => console.error(e.message)), cronOpts);
-  cron.schedule('0 14 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 2pm*').catch(e => console.error(e.message)), cronOpts);
-  cron.schedule('0 16 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 4pm*').catch(e => console.error(e.message)), cronOpts);
+  cron.schedule('0 15 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 3pm*').catch(e => console.error(e.message)), cronOpts);
   cron.schedule('0 20 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 8pm*').catch(e => console.error(e.message)), cronOpts);
   cron.schedule('0 22 * * *', () => postNewsUpdate(bot, '🔔 *News Update — 10pm*').catch(e => console.error(e.message)), cronOpts);
 }
