@@ -10,6 +10,19 @@ const BLOCKED_DOMAINS = [
   'medium.com',   // blog platform, inconsistent quality
 ];
 
+// Reputable news outlets. Passed to NewsAPI's `domains` param so the main
+// feed and category commands only ever return real journalism — not SEO /
+// affiliate blogs. (Not applied to /search and /stock so niche lookups can
+// still pull from anywhere.)
+const TRUSTED_SOURCES = [
+  'reuters.com', 'apnews.com', 'bloomberg.com', 'cnbc.com', 'ft.com',
+  'wsj.com', 'bbc.com', 'bbc.co.uk', 'theguardian.com', 'marketwatch.com',
+  'businessinsider.com', 'forbes.com', 'economist.com', 'axios.com',
+  'fortune.com', 'barrons.com', 'nytimes.com', 'washingtonpost.com',
+  'aljazeera.com', 'channelnewsasia.com', 'straitstimes.com',
+  'techcrunch.com', 'theverge.com', 'arstechnica.com', 'wired.com'
+].join(',');
+
 function isCleanArticle(article) {
   if (!article || !article.url) return false;
   try {
@@ -33,7 +46,7 @@ async function fetchNews(category, pageSize = 10) {
   };
   trackApiCall();
   const response = await axios.get('https://newsapi.org/v2/everything', {
-    params: { q: queries[category], language: 'en', sortBy: 'publishedAt', pageSize: pageSize + 6, apiKey: NEWS_API_KEY }
+    params: { q: queries[category], domains: TRUSTED_SOURCES, language: 'en', sortBy: 'publishedAt', pageSize: pageSize + 6, apiKey: NEWS_API_KEY }
   });
   return filterArticles(response.data.articles).slice(0, pageSize);
 }
@@ -62,6 +75,7 @@ async function fetchCombinedNews(pageSize = 15) {
   const response = await axios.get('https://newsapi.org/v2/everything', {
     params: {
       q: 'stock market OR geopolitics OR artificial intelligence OR economy',
+      domains: TRUSTED_SOURCES,
       language: 'en',
       sortBy: 'publishedAt',
       pageSize: Math.min(pageSize + 10, 100),
