@@ -3,7 +3,11 @@ const TelegramBot = require('node-telegram-bot-api');
 const { registerCommands } = require('./src/commands');
 const { registerScheduler } = require('./src/scheduler');
 const { registerReader } = require('./src/reader');
-const { startWebServer } = require('./src/webserver');
+const { startWebServer, getStories } = require('./src/webserver');
+
+function escHtml(text) {
+  return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true });
 
@@ -21,20 +25,36 @@ if (WEBAPP_URL) {
   bot.setChatMenuButton({ menu_button: { type: 'web_app', text: '📰 News', web_app: { url: WEBAPP_URL } } })
     .catch(err => console.error('setChatMenuButton failed:', err.message));
 
-  bot.onText(/\/news|\/swipe/, (msg) => {
+  bot.onText(/\/news|\/swipe/, async (msg) => {
     if (msg.chat.type !== 'private') {
       bot.sendMessage(msg.chat.id, "📰 Open today's news reader from a *private* chat with me — tap the ☰ button next to the message box.", { parse_mode: 'Markdown' });
       return;
     }
-    const caption =
-      "📰 <b>Today's Top Stories</b>\n\n" +
-      "Tap the button below to open a full-screen reader. You'll get the day's biggest stories — each with a photo and a short, easy-to-read summary.\n\n" +
-      "👉 Once it opens: <b>tap the RIGHT side</b> of the screen for the next story, and the <b>LEFT side</b> to go back.";
-    bot.sendPhoto(msg.chat.id, READER_BANNER, {
+
+    // Use the real top story as a teaser: its photo + headline, like a link preview.
+    let top = null, count = 0;
+    try {
+      const stories = await getStories();
+      if (stories && stories.length) { top = stories[0]; count = stories.length; }
+    } catch (err) {
+      console.error('/news teaser fetch failed:', err.message);
+    }
+
+    const caption = top
+      ? `📰 <b>Today's Top Stories</b>\n\n<b>${escHtml(top.title)}</b>\n\n…and ${count - 1} more inside 👇`
+      : "📰 <b>Today's Top Stories</b>\n\nTap below to read today's news 👇";
+    const photo = (top && top.image) ? top.image : READER_BANNER;
+    const opts = {
       caption,
       parse_mode: 'HTML',
-      reply_markup: { inline_keyboard: [[{ text: '📰 Open Today\'s News', web_app: { url: WEBAPP_URL } }]] }
-    }).catch(err => console.error('/news send failed:', err.message));
+      reply_markup: { inline_keyboard: [[{ text: '📰 Read the news', web_app: { url: WEBAPP_URL } }]] }
+    };
+
+    try {
+      await bot.sendPhoto(msg.chat.id, photo, opts);
+    } catch (_) {
+      await bot.sendPhoto(msg.chat.id, READER_BANNER, opts).catch(err => console.error('/news send failed:', err.message));
+    }
   });
 } else {
   console.warn('⚠️  WEBAPP_URL not set — Mini App launch button disabled (set it to your public Railway domain to enable /news).');

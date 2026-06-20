@@ -46,4 +46,4 @@ function startWebServer() {
   app.listen(port, () => console.log(`Nomo News web app listening on :${port}`));
 }
 
-module.exports = { startWebServer };
+module.exports = { startWebServer, getStories };
