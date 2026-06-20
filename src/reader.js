@@ -1,4 +1,6 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const { fetchCombinedNews } = require('./news');
 const { generateSummaries } = require('./groq');
 const { escapeMarkdown, truncate } = require('./helpers');
@@ -8,18 +10,56 @@ const PLACEHOLDER = 'https://placehold.co/1024x576/1a1a2e/FFD700.png?text=NOMO+N
 const STORY_COUNT = 10;
 const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-// In-memory carousel sessions:
+// Where sessions are persisted. Set READER_STORE to a Railway volume path
+// (e.g. /data/reader-sessions.json) so sessions also survive redeploys.
+const STORE_PATH = process.env.READER_STORE || path.join(__dirname, '..', 'reader-sessions.json');
+
+// Carousel sessions:
 //   sid -> { articles, summaries, buffers, fileIds, index, createdAt }
-// buffers[i]  = pre-downloaded image Buffer (or null)
+// buffers[i]  = pre-downloaded image Buffer (or null) — NOT persisted
 // fileIds[i]  = Telegram file_id cached after the photo is first shown
 const sessions = new Map();
 let sidCounter = 0;
 
+// Persists sessions to disk (without the large image buffers — cached
+// Telegram file_ids stay valid across restarts and do the same job).
+function saveSessions() {
+  try {
+    const obj = {};
+    for (const [sid, s] of sessions) {
+      obj[sid] = { articles: s.articles, summaries: s.summaries, fileIds: s.fileIds, index: s.index, createdAt: s.createdAt };
+    }
+    fs.writeFileSync(STORE_PATH, JSON.stringify(obj));
+  } catch (e) {
+    console.error('Reader session save failed:', e.message);
+  }
+}
+
+function loadSessions() {
+  try {
+    if (!fs.existsSync(STORE_PATH)) return;
+    const obj = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
+    const now = Date.now();
+    let maxSid = 0;
+    for (const [sid, s] of Object.entries(obj)) {
+      if (!s || now - s.createdAt > SESSION_TTL) continue;
+      sessions.set(sid, { articles: s.articles, summaries: s.summaries || [], fileIds: s.fileIds || {}, index: s.index || 0, buffers: [], createdAt: s.createdAt });
+      const n = parseInt(sid, 10);
+      if (!Number.isNaN(n) && n > maxSid) maxSid = n;
+    }
+    sidCounter = maxSid; // keep new ids from colliding with restored ones
+  } catch (e) {
+    console.error('Reader session load failed:', e.message);
+  }
+}
+
 function pruneSessions() {
   const now = Date.now();
+  let removed = false;
   for (const [sid, s] of sessions) {
-    if (now - s.createdAt > SESSION_TTL) sessions.delete(sid);
+    if (now - s.createdAt > SESSION_TTL) { sessions.delete(sid); removed = true; }
   }
+  if (removed) saveSessions();
 }
 
 // Pre-downloads an image so we can upload the bytes to Telegram directly
@@ -104,15 +144,16 @@ async function startReader(bot, chatId, opts = {}) {
     sessions.set(sid, s);
 
     const a = articles[0];
-    const opts = { caption: buildCaption(a, summaries[0], 0, articles.length), parse_mode: 'Markdown', reply_markup: buildKeyboard(sid, a) };
+    const sendOpts = { caption: buildCaption(a, summaries[0], 0, articles.length), parse_mode: 'Markdown', reply_markup: buildKeyboard(sid, a) };
     for (const src of imageSources(s, 0)) {
       try {
-        const sent = await bot.sendPhoto(chatId, src, opts);
+        const sent = await bot.sendPhoto(chatId, src, sendOpts);
         const fid = extractFileId(sent);
         if (fid) s.fileIds[0] = fid;
         break;
       } catch (_) { /* try next source */ }
     }
+    saveSessions();
     if (loading) await bot.deleteMessage(chatId, loading.message_id).catch(() => {});
   } catch (err) {
     await fail(`😬 Could not load the reader. Error: ${err.message}`);
@@ -120,6 +161,7 @@ async function startReader(bot, chatId, opts = {}) {
 }
 
 function registerReader(bot) {
+  loadSessions();
   bot.onText(/\/read|📖 Read/, (msg) => startReader(bot, msg.chat.id));
 
   bot.on('callback_query', async (q) => {
@@ -151,6 +193,7 @@ function registerReader(bot) {
         break;
       } catch (_) { /* try next source */ }
     }
+    saveSessions();
   });
 }
 
