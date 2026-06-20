@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { fetchCombinedNews } = require('./news');
 const { generateSummaries } = require('./groq');
-const { escapeMarkdown, truncate } = require('./helpers');
+const { truncate } = require('./helpers');
 
 // Fallback image Telegram can fetch when an article has no usable photo.
 const PLACEHOLDER = 'https://placehold.co/1024x576/1a1a2e/FFD700.png?text=NOMO+NEWS';
@@ -76,22 +76,30 @@ async function fetchBuffer(url) {
   }
 }
 
-function buildCaption(article, summary, idx, total) {
-  const src = escapeMarkdown((article.source && article.source.name) || 'Nomo Wire');
-  const badge = idx === 0 ? '🔴 TOP STORY · ' : '📰 ';
-  const title = escapeMarkdown(truncate(article.title, 180));
-  const body = escapeMarkdown(truncate(summary || article.description || 'No summary available.', 600));
-  return `${badge}*${src}*\n*${title}*\n\n${body}\n\n📖 Story ${idx + 1} / ${total}`;
+// HTML-escapes text for an HTML-parse_mode caption.
+function escHtml(text) {
+  return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function buildKeyboard(sid, article) {
+// Caption uses HTML so the headline can be a clickable link to the article.
+function buildCaption(article, summary, idx, total) {
+  const src = escHtml((article.source && article.source.name) || 'Nomo Wire');
+  const badge = idx === 0 ? '🔴 TOP STORY · ' : '📰 ';
+  const title = escHtml(truncate(article.title, 180));
+  const body = escHtml(truncate(summary || article.description || 'No summary available.', 600));
+  const headline = article.url
+    ? `<b><a href="${escHtml(article.url)}">${title}</a></b>`
+    : `<b>${title}</b>`;
+  return `${badge}<b>${src}</b>\n${headline}\n\n${body}\n\n📖 Story ${idx + 1} / ${total}\n<i>Tap the headline to read the full story</i>`;
+}
+
+function buildKeyboard(sid) {
+  // One button per row → each spans the full width, giving a much larger,
+  // easier tap target than two half-width buttons sharing a row.
   return {
     inline_keyboard: [
-      [
-        { text: '◀ Prev', callback_data: `rd:p:${sid}` },
-        { text: 'Next ▶', callback_data: `rd:n:${sid}` }
-      ],
-      [{ text: '📖 Read full story', url: article.url || 'https://t.me' }]
+      [{ text: '➡️   Next story', callback_data: `rd:n:${sid}` }],
+      [{ text: '⬅️   Previous story', callback_data: `rd:p:${sid}` }]
     ]
   };
 }
@@ -144,7 +152,7 @@ async function startReader(bot, chatId, opts = {}) {
     sessions.set(sid, s);
 
     const a = articles[0];
-    const sendOpts = { caption: buildCaption(a, summaries[0], 0, articles.length), parse_mode: 'Markdown', reply_markup: buildKeyboard(sid, a) };
+    const sendOpts = { caption: buildCaption(a, summaries[0], 0, articles.length), parse_mode: 'HTML', reply_markup: buildKeyboard(sid) };
     for (const src of imageSources(s, 0)) {
       try {
         const sent = await bot.sendPhoto(chatId, src, sendOpts);
@@ -184,10 +192,10 @@ function registerReader(bot) {
     const a = s.articles[i];
 
     const caption = buildCaption(a, s.summaries[i], i, total);
-    const editOpts = { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: buildKeyboard(sid, a) };
+    const editOpts = { chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: buildKeyboard(sid) };
     for (const src of imageSources(s, i)) {
       try {
-        const res = await bot.editMessageMedia({ type: 'photo', media: src, caption, parse_mode: 'Markdown' }, editOpts);
+        const res = await bot.editMessageMedia({ type: 'photo', media: src, caption, parse_mode: 'HTML' }, editOpts);
         const fid = extractFileId(res);
         if (fid) s.fileIds[i] = fid;
         break;
