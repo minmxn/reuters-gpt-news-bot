@@ -1,9 +1,8 @@
-const fs = require('fs');
 const cron = require('node-cron');
 const { TZ, CHAT_ID } = require('../config');
 const { fetchCombinedNews } = require('./news');
 const { askGroq, generateMCQSet, generatePoll } = require('./groq');
-const { generateNewsPDF } = require('./pdf');
+const { startReader } = require('./reader');
 const { buildNewsBody } = require('./helpers');
 const { dailyPolls, weeklyQuestions } = require('../data/polls');
 const { mcqQuestions, mcqState } = require('../data/mcq');
@@ -30,7 +29,7 @@ const scheduleText =
 ━━━━━━━━━━━━━━━━━━━━━
 🌅 *MORNING*
 ━━━━━━━━━━━━━━━━━━━━━
-☀️  8:00am — Morning Briefing + PDF Magazine
+☀️  8:00am — Morning Briefing + Story Reader
 🗳️  9:00am — Daily Poll
 🧠 10:00am — Daily MCQ Quiz
 ✅ 11:00am — MCQ Answer Revealed
@@ -41,7 +40,7 @@ const scheduleText =
 📰 12:00pm — News Update
 📰  2:00pm — News Update
 📰  4:00pm — News Update
-🌆  6:00pm — Evening News + PDF Magazine
+🌆  6:00pm — Evening Edition Story Reader
 📰  8:00pm — News Update
 📰 10:00pm — News Update
 
@@ -95,16 +94,14 @@ function registerScheduler(bot) {
   //   /testpdf:        1 (fetchCombinedNews)
   //   Total scheduled: ~9/day — leaves ~90 calls for user commands
 
-  // 8:00am SGT — Morning briefing + PDF
+  // 8:00am SGT — Morning briefing + swipeable reader
   cron.schedule('0 8 * * *', async () => {
     try {
       const allArticles = await fetchCombinedNews(15);
       const allNews = allArticles.map(a => a.title).join('\n');
       const summary = await askGroq('Give me a short friendly morning briefing. Simple, clear and easy to understand.', allNews);
       await bot.sendMessage(CHAT_ID, `☀️ *Good Morning! Your Daily Briefing*\n\n${summary}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
-      const pdfPath = await generateNewsPDF(allArticles, 'Morning Edition');
-      await bot.sendDocument(CHAT_ID, pdfPath, { caption: `📰 *Nomo News — Morning Edition*\n\n_BUILT BY MIN_ ⚡`, parse_mode: 'Markdown' });
-      fs.unlinkSync(pdfPath);
+      await startReader(bot, CHAT_ID, { silent: true, articles: allArticles });
     } catch (err) {
       console.error('Morning briefing error:', err.message);
     }
@@ -177,15 +174,12 @@ function registerScheduler(bot) {
     }
   }, cronOpts);
 
-  // 6:00pm SGT — Evening news + PDF
+  // 6:00pm SGT — Evening edition (swipeable reader)
   cron.schedule('0 18 * * *', async () => {
     try {
       const allArticles = await fetchCombinedNews(15);
-      const newsText = buildNewsBody(allArticles, 10);
-      await bot.sendMessage(CHAT_ID, `🌆 *Evening News Update*\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
-      const pdfPath = await generateNewsPDF(allArticles, 'Evening Edition');
-      await bot.sendDocument(CHAT_ID, pdfPath, { caption: `📰 *Nomo News — Evening Edition*\n\n_BUILT BY MIN_ ⚡`, parse_mode: 'Markdown' });
-      fs.unlinkSync(pdfPath);
+      await bot.sendMessage(CHAT_ID, `🌆 *Evening Edition* — tap through today's top stories 👇\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
+      await startReader(bot, CHAT_ID, { silent: true, articles: allArticles });
     } catch (err) {
       console.error('Evening news error:', err.message);
     }

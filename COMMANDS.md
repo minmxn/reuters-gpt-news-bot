@@ -82,13 +82,13 @@ nomo-news-bot/
 
 | Time | Post |
 |---|---|
-| 8:00am | Morning Briefing + PDF |
+| 8:00am | Morning Briefing + Story Reader (tap-through carousel) |
 | 9:00am | Daily Poll (+ Weekly Question on Mondays) |
 | 10:00am | MCQ Quiz |
 | 11:00am | MCQ Answer Revealed |
 | 12:00pm | News Update |
 | 2:00pm | News Update |
 | 4:00pm | News Update |
-| 6:00pm | Evening News + PDF |
+| 6:00pm | Evening Edition Story Reader (tap-through carousel) |
 | 8:00pm | News Update |
 | 10:00pm | News Update |

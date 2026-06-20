@@ -74,13 +74,19 @@ function extractFileId(msg) {
   return null;
 }
 
-async function startReader(bot, chatId) {
+// opts.articles — pre-fetched articles to reuse (skips a NewsAPI call)
+// opts.silent   — skip the "Loading…" message (used for scheduled posts)
+async function startReader(bot, chatId, opts = {}) {
   pruneSessions();
-  const loading = await bot.sendMessage(chatId, '📖 Loading your news reader...');
+  const loading = opts.silent ? null : await bot.sendMessage(chatId, '📖 Loading your news reader...');
+  const fail = async (text) => {
+    if (loading) await bot.editMessageText(text, { chat_id: chatId, message_id: loading.message_id }).catch(() => {});
+    else await bot.sendMessage(chatId, text).catch(() => {});
+  };
   try {
-    const articles = (await fetchCombinedNews(STORY_COUNT)).slice(0, STORY_COUNT);
+    const articles = (opts.articles || await fetchCombinedNews(STORY_COUNT)).slice(0, STORY_COUNT);
     if (articles.length === 0) {
-      await bot.editMessageText('😬 No news available right now. Try again later!', { chat_id: chatId, message_id: loading.message_id });
+      await fail('😬 No news available right now. Try again later!');
       return;
     }
 
@@ -107,9 +113,9 @@ async function startReader(bot, chatId) {
         break;
       } catch (_) { /* try next source */ }
     }
-    await bot.deleteMessage(chatId, loading.message_id).catch(() => {});
+    if (loading) await bot.deleteMessage(chatId, loading.message_id).catch(() => {});
   } catch (err) {
-    await bot.editMessageText(`😬 Could not load the reader. Error: ${err.message}`, { chat_id: chatId, message_id: loading.message_id }).catch(() => {});
+    await fail(`😬 Could not load the reader. Error: ${err.message}`);
   }
 }
 
@@ -148,4 +154,4 @@ function registerReader(bot) {
   });
 }
 
-module.exports = { registerReader };
+module.exports = { registerReader, startReader };
