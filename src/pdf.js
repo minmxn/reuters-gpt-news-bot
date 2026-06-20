@@ -15,10 +15,10 @@ const MUTE = '#cfcfe0';
 const LINE = '#e3e3e8';
 
 const M = 40; // page margin
+const STORY_COUNT = 10; // full-page stories (plus a cover)
 
 // ─── HELPERS ──────────────────────────────────────────────────────
 
-// Collapses whitespace and truncates with an ellipsis.
 function truncate(text, max) {
   if (!text) return '';
   const t = text.replace(/\s+/g, ' ').trim();
@@ -29,9 +29,17 @@ function sourceName(article) {
   return (article.source && article.source.name ? article.source.name : 'Nomo Wire').toUpperCase();
 }
 
+// NewsAPI free-tier `content` ends with a "[+1234 chars]" marker — strip it.
+function cleanContent(article) {
+  const body = (article.content || '').replace(/\s*\[\+\d+\s*chars\]\s*$/i, '').trim();
+  if (!body) return '';
+  const desc = (article.description || '').trim();
+  if (desc && body.slice(0, 30) === desc.slice(0, 30)) return ''; // avoid duplicating standfirst
+  return body;
+}
+
 // Downloads an article image as a Buffer. PDFKit only supports JPEG/PNG,
-// so anything else (WebP/GIF/SVG) or a failed request returns null and the
-// caller falls back to a branded placeholder.
+// so anything else (WebP/GIF/SVG) or a failed request returns null.
 async function fetchImage(url) {
   if (!url) return null;
   try {
@@ -49,7 +57,8 @@ async function fetchImage(url) {
 }
 
 // Draws an image cropped to fill the box, or a navy/gold placeholder.
-function drawImageBox(doc, img, x, y, w, h) {
+// frame=false skips the border (used for full-bleed cover image).
+function drawImageBox(doc, img, x, y, w, h, frame = true) {
   let drawn = false;
   if (img) {
     doc.save();
@@ -63,122 +72,129 @@ function drawImageBox(doc, img, x, y, w, h) {
   if (!drawn) {
     doc.save();
     doc.rect(x, y, w, h).fill(NAVY);
-    doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(Math.min(18, w / 9))
-      .text('NOMO NEWS', x, y + h / 2 - 9, { width: w, align: 'center', characterSpacing: 1 });
+    doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(Math.min(22, w / 9))
+      .text('NOMO NEWS', x, y + h / 2 - 11, { width: w, align: 'center', characterSpacing: 1 });
     doc.restore();
   }
-  // subtle frame
-  doc.rect(x, y, w, h).lineWidth(0.5).strokeColor(LINE).stroke();
+  if (frame) doc.rect(x, y, w, h).lineWidth(0.5).strokeColor(LINE).stroke();
 }
 
-// ─── HEADERS / FOOTERS ────────────────────────────────────────────
+// ─── COVER PAGE ───────────────────────────────────────────────────
 
-function drawMasthead(doc, edition, dateStr) {
+function drawCover(doc, article, img, dateStr, edition) {
   const W = doc.page.width;
-  doc.rect(0, 0, W, 96).fill(NAVY);
-  doc.rect(0, 96, W, 4).fill(GOLD);
-  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(34)
-    .text('NOMO NEWS', M, 26, { characterSpacing: 1 });
-  doc.fillColor('#ffffff').font('Helvetica').fontSize(9)
-    .text('YOUR DAILY MARKETS & WORLD BRIEFING', M + 2, 66, { characterSpacing: 2 });
-  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(11)
-    .text(edition.toUpperCase(), M, 30, { width: W - M * 2, align: 'right' });
-  doc.fillColor(MUTE).font('Helvetica').fontSize(9)
-    .text(dateStr, M, 46, { width: W - M * 2, align: 'right' });
-  return 96 + 4 + 20;
-}
+  const H = doc.page.height;
 
-function drawMiniHeader(doc, edition) {
-  const W = doc.page.width;
-  doc.rect(0, 0, W, 46).fill(NAVY);
-  doc.rect(0, 46, W, 3).fill(GOLD);
-  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(16)
-    .text('NOMO NEWS', M, 14, { characterSpacing: 1 });
-  doc.fillColor(MUTE).font('Helvetica').fontSize(9)
-    .text(edition.toUpperCase(), M, 18, { width: W - M * 2, align: 'right' });
-  return 46 + 3 + 18;
-}
+  // full-bleed lead photo
+  drawImageBox(doc, img, 0, 0, W, H, false);
 
-// ─── HERO STORY ───────────────────────────────────────────────────
-
-function drawHero(doc, article, img, y) {
-  const W = doc.page.width - M * 2;
-  const imgH = 220;
-  drawImageBox(doc, img, M, y, W, imgH);
-
-  // bottom gradient bar for label legibility
+  // top masthead overlay
   doc.save();
-  doc.rect(M, y + imgH - 34, W, 34).fillOpacity(0.62).fill(NAVY);
+  doc.rect(0, 0, W, 124).fillOpacity(0.58).fill(NAVY);
+  doc.restore();
+  doc.rect(0, 124, W, 4).fill(GOLD);
+  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(40)
+    .text('NOMO NEWS', M, 34, { characterSpacing: 1 });
+  doc.fillColor('#ffffff').font('Helvetica').fontSize(10)
+    .text('YOUR DAILY MARKETS & WORLD BRIEFING', M + 2, 84, { characterSpacing: 2.5 });
+  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(12)
+    .text(edition.toUpperCase(), M, 40, { width: W - M * 2, align: 'right' });
+  doc.fillColor(MUTE).font('Helvetica').fontSize(10)
+    .text(dateStr, M, 58, { width: W - M * 2, align: 'right' });
+
+  // bottom teaser overlay
+  const bandTop = H - 232;
+  doc.save();
+  doc.rect(0, bandTop, W, 232).fillOpacity(0.72).fill(NAVY);
   doc.restore();
 
-  // TOP STORY badge
-  doc.rect(M + 14, y + 14, 88, 20).fill(RED);
+  doc.rect(M, bandTop + 30, 96, 22).fill(RED);
+  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10)
+    .text('TOP STORY', M, bandTop + 37, { width: 96, align: 'center', characterSpacing: 1 });
+
+  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(10)
+    .text(sourceName(article), M, bandTop + 64, { characterSpacing: 1.5 });
+
+  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(27)
+    .text(truncate(article.title, 150), M, bandTop + 82, { width: W - M * 2, lineGap: 2 });
+}
+
+// ─── STORY PAGE ───────────────────────────────────────────────────
+
+function drawStoryMasthead(doc, edition, dateStr, idx, total) {
+  const W = doc.page.width;
+  doc.rect(0, 0, W, 56).fill(NAVY);
+  doc.rect(0, 56, W, 3).fill(GOLD);
+  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(17)
+    .text('NOMO NEWS', M, 16, { characterSpacing: 1 });
+  doc.fillColor(MUTE).font('Helvetica').fontSize(9)
+    .text(`${edition.toUpperCase()}  ·  ${dateStr}`, M, 20, { width: W - M * 2, align: 'right' });
+  doc.fillColor('#ffffff').font('Helvetica').fontSize(8)
+    .text(`STORY ${String(idx).padStart(2, '0')} / ${total}`, M, 38, { width: W - M * 2, align: 'right' });
+  return 56 + 3 + 18;
+}
+
+function drawStory(doc, article, img, dateStr, edition, idx, total) {
+  const W = doc.page.width - M * 2;
+  let y = drawStoryMasthead(doc, edition, dateStr, idx, total);
+
+  // hero image
+  const heroH = 300;
+  drawImageBox(doc, img, M, y, W, heroH);
+
+  // category badge + source overlay
+  doc.rect(M + 14, y + 14, 86, 20).fill(idx === 1 ? RED : NAVY);
   doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9)
-    .text('TOP STORY', M + 14, y + 20, { width: 88, align: 'center', characterSpacing: 1 });
-
-  // source over the gradient
+    .text(idx === 1 ? 'TOP STORY' : 'BRIEFING', M + 14, y + 20, { width: 86, align: 'center', characterSpacing: 1 });
+  doc.save();
+  doc.rect(M, y + heroH - 30, W, 30).fillOpacity(0.62).fill(NAVY);
+  doc.restore();
   doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(9)
-    .text(sourceName(article), M + 14, y + imgH - 23, { characterSpacing: 1 });
+    .text(sourceName(article), M + 14, y + heroH - 20, { characterSpacing: 1.5 });
 
-  let ty = y + imgH + 14;
-  const title = truncate(article.title, 130);
-  doc.fillColor(INK).font('Helvetica-Bold').fontSize(19)
-    .text(title, M, ty, { width: W, lineGap: 1 });
-  ty += doc.heightOfString(title, { width: W, lineGap: 1 }) + 6;
+  y += heroH + 18;
 
-  const desc = truncate(article.description, 260);
-  if (desc) {
+  // headline
+  const title = truncate(article.title, 150);
+  doc.fillColor(INK).font('Helvetica-Bold').fontSize(22)
+    .text(title, M, y, { width: W, lineGap: 1 });
+  y += doc.heightOfString(title, { width: W, lineGap: 1 }) + 8;
+
+  // meta line
+  doc.fillColor(GRAY).font('Helvetica').fontSize(9.5)
+    .text(`${(article.source && article.source.name) || 'Nomo Wire'}   ·   ${dateStr}`, M, y);
+  y += 14;
+  doc.moveTo(M, y).lineTo(M + 70, y).lineWidth(2).strokeColor(GOLD).stroke();
+  y += 14;
+
+  // standfirst (serif)
+  const standfirst = truncate(article.description, 320);
+  if (standfirst) {
+    doc.fillColor(INK).font('Times-Roman').fontSize(13)
+      .text(standfirst, M, y, { width: W, lineGap: 3 });
+    y += doc.heightOfString(standfirst, { width: W, lineGap: 3 }) + 12;
+  }
+
+  // body paragraph (if content adds anything beyond the standfirst)
+  const body = truncate(cleanContent(article), 360);
+  if (body) {
     doc.fillColor(GRAY).font('Helvetica').fontSize(10.5)
-      .text(desc, M, ty, { width: W, lineGap: 1.5 });
-    ty += doc.heightOfString(desc, { width: W, lineGap: 1.5 }) + 8;
+      .text(body, M, y, { width: W, lineGap: 2 });
   }
 
-  doc.moveTo(M, ty).lineTo(M + W, ty).lineWidth(1).strokeColor(GOLD).stroke();
-  return ty + 18;
-}
-
-// ─── GRID CARDS ───────────────────────────────────────────────────
-
-const CARD_IMG_H = 116;
-
-function measureCard(doc, article, colW) {
-  let h = CARD_IMG_H + 8 + 11; // image + gap + source line
-  const title = truncate(article.title, 95);
-  doc.font('Helvetica-Bold').fontSize(11.5);
-  h += doc.heightOfString(title, { width: colW, lineGap: 0.5 }) + 4;
-  const desc = truncate(article.description, 130);
-  if (desc) {
-    doc.font('Helvetica').fontSize(9);
-    h += doc.heightOfString(desc, { width: colW, lineGap: 1 }) + 4;
-  }
-  return h;
-}
-
-function drawCard(doc, article, img, x, y, colW) {
-  drawImageBox(doc, img, x, y, colW, CARD_IMG_H);
-  let ty = y + CARD_IMG_H + 8;
-
-  doc.fillColor(RED).font('Helvetica-Bold').fontSize(8)
-    .text(sourceName(article), x, ty, { width: colW, characterSpacing: 0.5 });
-  ty += 11;
-
-  const title = truncate(article.title, 95);
-  doc.fillColor(INK).font('Helvetica-Bold').fontSize(11.5)
-    .text(title, x, ty, { width: colW, lineGap: 0.5 });
-  ty += doc.heightOfString(title, { width: colW, lineGap: 0.5 }) + 4;
-
-  const desc = truncate(article.description, 130);
-  if (desc) {
-    doc.fillColor(GRAY).font('Helvetica').fontSize(9)
-      .text(desc, x, ty, { width: colW, lineGap: 1 });
-  }
+  // clickable read-more pinned near the bottom
+  const ry = doc.page.height - 64;
+  const label = 'Read the full story  ›';
+  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10.5)
+    .text(label, M, ry, { link: article.url || null, underline: false });
+  const lw = doc.widthOfString(label);
+  doc.moveTo(M, ry + 14).lineTo(M + lw, ry + 14).lineWidth(1.5).strokeColor(GOLD).stroke();
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────
 
 async function generateNewsPDF(articles, edition) {
-  const items = articles.slice(0, 15);
-  // Pre-download all images in parallel so the layout pass stays synchronous.
+  const items = articles.slice(0, STORY_COUNT);
   const images = await Promise.all(items.map(a => fetchImage(a.urlToImage)));
 
   return new Promise((resolve, reject) => {
@@ -192,46 +208,34 @@ async function generateNewsPDF(articles, edition) {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: TZ
     });
 
-    const W = doc.page.width - M * 2;
-    const gutter = 18;
-    const colW = (W - gutter) / 2;
-    const bottom = doc.page.height - 54;
-
-    let y = drawMasthead(doc, edition, dateStr);
-
-    if (items.length > 0) {
-      y = drawHero(doc, items[0], images[0], y);
+    if (items.length === 0) {
+      doc.fillColor(NAVY).fontSize(16).text('No news available right now.', M, 120);
+      doc.end();
+      stream.on('finish', () => resolve(filename));
+      stream.on('error', reject);
+      return;
     }
 
-    // Remaining stories as a two-column grid, row by row.
-    for (let i = 1; i < items.length; i += 2) {
-      const lh = measureCard(doc, items[i], colW);
-      const rh = items[i + 1] ? measureCard(doc, items[i + 1], colW) : 0;
-      const rowH = Math.max(lh, rh);
+    // Cover
+    drawCover(doc, items[0], images[0], dateStr, edition);
 
-      if (y + rowH > bottom) {
-        doc.addPage();
-        y = drawMiniHeader(doc, edition);
-      }
+    // One full page per story
+    items.forEach((article, i) => {
+      doc.addPage();
+      drawStory(doc, article, images[i], dateStr, edition, i + 1, items.length);
+    });
 
-      drawCard(doc, items[i], images[i], M, y, colW);
-      if (items[i + 1]) {
-        drawCard(doc, items[i + 1], images[i + 1], M + colW + gutter, y, colW);
-      }
-      y += rowH + 22;
-    }
-
-    // Footer band + page numbers on every page.
+    // Footer band + page numbers on every page except the cover.
     const range = doc.bufferedPageRange();
-    for (let p = 0; p < range.count; p++) {
+    for (let p = 1; p < range.count; p++) {
       doc.switchToPage(range.start + p);
       const PW = doc.page.width;
       const PH = doc.page.height;
-      doc.rect(0, PH - 32, PW, 32).fill(NAVY);
+      doc.rect(0, PH - 30, PW, 30).fill(NAVY);
       doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(8)
-        .text('BUILT BY MIN', M, PH - 21, { characterSpacing: 1 });
+        .text('BUILT BY MIN', M, PH - 20, { characterSpacing: 1 });
       doc.fillColor(MUTE).font('Helvetica').fontSize(8)
-        .text(`Page ${p + 1} of ${range.count}`, M, PH - 21, { width: PW - M * 2, align: 'right' });
+        .text(`Page ${p} of ${range.count - 1}`, M, PH - 20, { width: PW - M * 2, align: 'right' });
     }
 
     doc.end();
