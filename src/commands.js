@@ -174,7 +174,7 @@ function registerCommands(bot) {
     const text = msg.text;
     if (!text) return;
     if (text.startsWith('/')) return;
-    const buttonTexts = ['📈 Markets', '🌍 World', '💻 Tech', '☀️ Briefing', '😎 Mood', '🔍 Search', '🌏 Singapore', '🇺🇸 US', '🇨🇳 China', '📊 Stock', '📅 Schedule'];
+    const buttonTexts = ['📈 Markets', '🌍 World', '💻 Tech', '☀️ Briefing', '😎 Mood', '🔍 Search', '🌏 Singapore', '🇺🇸 US', '🇨🇳 China', '📊 Stock', '📖 Read', '📅 Schedule'];
     if (buttonTexts.includes(text)) return;
     if (!shouldRespond(msg)) return;
 

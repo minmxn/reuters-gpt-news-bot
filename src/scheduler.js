@@ -16,7 +16,7 @@ const mainKeyboard = {
     [{ text: '💻 Tech' }, { text: '☀️ Briefing' }],
     [{ text: '😎 Mood' }, { text: '🔍 Search' }],
     [{ text: '🌏 Singapore' }, { text: '🇺🇸 US' }, { text: '🇨🇳 China' }],
-    [{ text: '📊 Stock' }, { text: '📅 Schedule' }]
+    [{ text: '📊 Stock' }, { text: '📖 Read' }, { text: '📅 Schedule' }]
   ],
   resize_keyboard: true
 };

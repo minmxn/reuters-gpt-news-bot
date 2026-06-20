@@ -15,6 +15,7 @@
 | `/sg` | Singapore news |
 | `/us` | US news |
 | `/cn` | China news |
+| `/read` | Tap-through news reader (flip stories with ◀ ▶ buttons) |
 | `/quota` | Check NewsAPI usage today (100/day limit) |
 | `/testpdf` | Generate a test PDF magazine |
 | `/schedule` | View the daily posting schedule |
@@ -33,6 +34,7 @@
 | 🇺🇸 US | `/us` |
 | 🇨🇳 China | `/cn` |
 | 📊 Stock | `/stock` |
+| 📖 Read | `/read` |
 | 📅 Schedule | `/schedule` |
 
 ## Register Commands with BotFather
@@ -51,6 +53,7 @@ stock - Stock news e.g. /stock NVDA
 sg - Singapore news
 us - US news
 cn - China news
+read - Tap-through news reader
 quota - Check NewsAPI usage today
 testpdf - Generate a test PDF
 schedule - View the daily schedule
