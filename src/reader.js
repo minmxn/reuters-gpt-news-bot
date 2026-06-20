@@ -2,7 +2,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { fetchCombinedNews } = require('./news');
-const { generateSummaries } = require('./groq');
+const { generateSummaries, AI_CREDIT } = require('./groq');
 const { truncate } = require('./helpers');
 
 // Fallback image Telegram can fetch when an article has no usable photo.
@@ -83,6 +83,7 @@ function escHtml(text) {
 
 // Caption uses HTML so the headline can be a clickable link to the article.
 function buildCaption(article, summary, idx, total) {
+  const isAI = !!(summary && summary.trim());
   const src = escHtml((article.source && article.source.name) || 'Nomo Wire');
   const badge = idx === 0 ? '🔴 TOP STORY · ' : '📰 ';
   const title = escHtml(truncate(article.title, 180));
@@ -90,7 +91,8 @@ function buildCaption(article, summary, idx, total) {
   const headline = article.url
     ? `<b><a href="${escHtml(article.url)}">${title}</a></b>`
     : `<b>${title}</b>`;
-  return `${badge}<b>${src}</b>\n${headline}\n\n${body}\n\n📖 Story ${idx + 1} / ${total}\n<i>Tap the headline to read the full story</i>`;
+  const credit = isAI ? `\n<i>🤖 ${escHtml(AI_CREDIT)}</i>` : '';
+  return `${badge}<b>${src}</b>\n${headline}\n\n${body}${credit}\n\n📖 Story ${idx + 1} / ${total}\n<i>Tap the headline to read the full story</i>`;
 }
 
 function buildKeyboard(sid) {

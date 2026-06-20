@@ -27,6 +27,7 @@
   .src { color:var(--gold); font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; }
   .headline { font-size:22px; font-weight:600; line-height:1.22; margin:8px 0 0; }
   .summary { font-size:15px; line-height:1.6; color:#d7d7e0; margin:12px 0 0; overflow-y:auto; }
+  .credit { font-size:11.5px; color:#8a8a99; margin:10px 0 0; font-style:italic; }
   .read { margin-top:auto; padding-top:14px; position:relative; z-index:5; }
   .read a { color:var(--gold); font-size:15px; font-weight:600; text-decoration:none;
     border-bottom:2px solid var(--gold); padding-bottom:3px; }
@@ -80,11 +81,12 @@
     haptic();
   }
 
-  function render(stories) {
+  function render(stories, credit) {
     total = stories.length;
     deck.innerHTML = stories.map(function (s, i) {
       var photo = s.image ? 'style="background-image:url(\'' + esc(s.image) + '\')"' : '';
       var badge = i === 0 ? 'TOP STORY' : 'BRIEFING';
+      var creditEl = (s.ai && credit) ? '<div class="credit">🤖 ' + esc(credit) + '</div>' : '';
       var read = s.url
         ? '<div class="read"><a href="#" onclick="openLink(\'' + esc(s.url) + '\');return false;">Read the full story ›</a></div>'
         : '';
@@ -94,6 +96,7 @@
         + '<div class="src">' + esc(s.source) + '</div>'
         + '<h1 class="headline">' + esc(s.title) + '</h1>'
         + '<p class="summary">' + esc(s.summary) + '</p>'
+        + creditEl
         + read
         + '</div></section>';
     }).join('');
@@ -136,7 +139,7 @@
   fetch('/api/stories')
     .then(function (r) { return r.json(); })
     .then(function (d) {
-      if (d.stories && d.stories.length) render(d.stories);
+      if (d.stories && d.stories.length) render(d.stories, d.credit);
       else document.getElementById('status').textContent = 'No news available right now. Try again later.';
     })
     .catch(function () {

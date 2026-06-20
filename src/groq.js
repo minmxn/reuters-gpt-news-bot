@@ -1,6 +1,9 @@
 const axios = require('axios');
 const { GROQ_API_KEY } = require('../config');
 
+// Attribution shown wherever an AI-generated summary is displayed.
+const AI_CREDIT = 'Summarised by Groq AI';
+
 async function askGroq(question, newsContext = '') {
   const prompt = `You are a witty, friendly financial and geopolitical news analyst built by MIN.
 You explain complex news in plain simple English that anyone can understand.
@@ -132,4 +135,4 @@ Provide exactly ${articles.length} summaries.`;
   return s.map(x => x.trim());
 }
 
-module.exports = { askGroq, generateMCQSet, generatePoll, generateSummaries };
+module.exports = { askGroq, generateMCQSet, generatePoll, generateSummaries, AI_CREDIT };

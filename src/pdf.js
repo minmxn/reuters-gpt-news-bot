@@ -4,7 +4,7 @@ const os = require('os');
 const path = require('path');
 const axios = require('axios');
 const { TZ } = require('../config');
-const { generateSummaries } = require('./groq');
+const { generateSummaries, AI_CREDIT } = require('./groq');
 
 // ─── PALETTE ──────────────────────────────────────────────────────
 const NAVY = '#1a1a2e';
@@ -190,10 +190,16 @@ function drawStory(doc, article, img, summary, dateStr, edition, idx, total) {
   y += 16;
 
   // AI summary as the editorial body (serif)
+  const isAI = !!(summary && summary.trim());
   const text = summary || truncate(article.description, 320);
   if (text) {
     doc.fillColor(INK).font('Times-Roman').fontSize(13)
       .text(text, M, y, { width: W, lineGap: 3.5, align: 'left' });
+    y += doc.heightOfString(text, { width: W, lineGap: 3.5 }) + 8;
+  }
+  if (isAI) {
+    doc.fillColor(GRAY).font('Helvetica-Oblique').fontSize(9)
+      .text(AI_CREDIT, M, y, { width: W });
   }
 
   // clickable read-more pinned near the bottom

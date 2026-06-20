@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { fetchCombinedNews } = require('./news');
-const { generateSummaries } = require('./groq');
+const { generateSummaries, AI_CREDIT } = require('./groq');
 
 const STORY_COUNT = 10;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
@@ -21,6 +21,7 @@ async function getStories() {
     title: a.title || 'Untitled',
     source: (a.source && a.source.name) || 'Nomo Wire',
     summary: summaries[i] || a.description || '',
+    ai: Boolean(summaries[i] && summaries[i].trim()),
     image: a.urlToImage || '',
     url: a.url || ''
   }));
@@ -34,7 +35,7 @@ function startWebServer() {
 
   app.get('/api/stories', async (req, res) => {
     try {
-      res.json({ stories: await getStories() });
+      res.json({ stories: await getStories(), credit: AI_CREDIT });
     } catch (err) {
       console.error('Web app /api/stories error:', err.message);
       res.status(500).json({ error: 'Could not load stories' });
