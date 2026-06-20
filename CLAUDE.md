@@ -52,7 +52,11 @@ bot.js
 │   ├── reader.js          registerReader(bot) + startReader() — the /read
 │   │                      swipeable carousel (inline-button navigation)
 │   ├── webserver.js       startWebServer() — Express server for the Mini App:
-│   │                      serves public/ and GET /api/stories (cached 10 min)
+│   │                      serves public/ and GET /api/stories (cached 10 min);
+│   │                      also exports getStories() for reuse
+│   ├── teaser.js          sendTopStoriesTeaser() — posts a top-story photo +
+│   │                      headline card with a button that opens the reader
+│   │                      (web_app button in private chats, link button in groups)
 │   ├── news.js            NewsAPI fetchers + blocked-domain filtering
 │   ├── groq.js            askGroq + generateSummaries / generateMCQSet /
 │   │                      generatePoll (JSON mode, with timeout)
@@ -89,7 +93,7 @@ bot.js
 | 11:00am | MCQ answers | scheduler.js |
 | 12:00pm | News reader (carousel) | scheduler.js → reader.js |
 | 3:00pm | News reader (carousel) | scheduler.js → reader.js |
-| 6:00pm | Evening news + PDF magazine | scheduler.js |
+| 6:00pm | Evening top-stories teaser card (opens the reader) | scheduler.js + teaser.js |
 | 8:00pm | News reader (carousel) | scheduler.js → reader.js |
 | 10:00pm | News reader (carousel) | scheduler.js → reader.js |
 

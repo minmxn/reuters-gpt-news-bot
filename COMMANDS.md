@@ -90,6 +90,6 @@ nomo-news-bot/
 | 11:00am | MCQ Answer Revealed |
 | 12:00pm | News Reader (tap-through carousel) |
 | 3:00pm | News Reader (tap-through carousel) |
-| 6:00pm | Evening News + PDF Magazine |
+| 6:00pm | Evening top-stories teaser (photo + headline + button to open the reader) |
 | 8:00pm | News Reader (tap-through carousel) |
 | 10:00pm | News Reader (tap-through carousel) |

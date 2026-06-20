@@ -1,11 +1,11 @@
 const fs = require('fs');
 const cron = require('node-cron');
-const { TZ, CHAT_ID } = require('../config');
+const { TZ, CHAT_ID, WEBAPP_URL } = require('../config');
 const { fetchCombinedNews } = require('./news');
 const { askGroq, generateMCQSet, generatePoll } = require('./groq');
 const { generateNewsPDF } = require('./pdf');
 const { startReader } = require('./reader');
-const { buildNewsBody } = require('./helpers');
+const { sendTopStoriesTeaser } = require('./teaser');
 const { dailyPolls, weeklyQuestions } = require('../data/polls');
 const { mcqQuestions, mcqState } = require('../data/mcq');
 
@@ -41,7 +41,7 @@ const scheduleText =
 ━━━━━━━━━━━━━━━━━━━━━
 📖 12:00pm — News Reader
 📖  3:00pm — News Reader
-🌆  6:00pm — Evening News + PDF Magazine
+🌆  6:00pm — Evening Top Stories
 📖  8:00pm — News Reader
 📖 10:00pm — News Reader
 
@@ -86,7 +86,7 @@ function registerScheduler(bot) {
   //   8am briefing+PDF:   1 (fetchCombinedNews)
   //   9am poll:           1 (fetchCombinedNews — for AI poll context)
   //   10am MCQ:           1 (fetchCombinedNews — for AI quiz context)
-  //   6pm evening+PDF:    1 (fetchCombinedNews)
+  //   6pm teaser:         1 (fetchCombinedNews via getStories)
   //   4x reader updates:  1 each = 4 (fetchCombinedNews via startReader)
   //   /testpdf:           1 (fetchCombinedNews)
   //   Total scheduled: ~9/day — leaves ~90 calls for user commands
@@ -173,15 +173,16 @@ function registerScheduler(bot) {
     }
   }, cronOpts);
 
-  // 6:00pm SGT — Evening news + PDF
+  // 6:00pm SGT — Evening top-stories teaser card
   cron.schedule('0 18 * * *', async () => {
     try {
-      const allArticles = await fetchCombinedNews(15);
-      const newsText = buildNewsBody(allArticles, 10);
-      await bot.sendMessage(CHAT_ID, `🌆 *Evening News Update*\n\n${newsText}\n\n_BUILT BY MIN_ ⚡`, { parse_mode: 'Markdown' });
-      const pdfPath = await generateNewsPDF(allArticles, 'Evening Edition');
-      await bot.sendDocument(CHAT_ID, pdfPath, { caption: `📰 *Nomo News — Evening Edition*\n\n_BUILT BY MIN_ ⚡`, parse_mode: 'Markdown' });
-      fs.unlinkSync(pdfPath);
+      if (WEBAPP_URL) {
+        await sendTopStoriesTeaser(bot, CHAT_ID, { url: WEBAPP_URL, webApp: false });
+      } else {
+        // No Mini App URL configured — fall back to the in-chat carousel.
+        await bot.sendMessage(CHAT_ID, '🌆 *Evening Edition* — tap through today\'s top stories 👇', { parse_mode: 'Markdown' });
+        await startReader(bot, CHAT_ID, { silent: true });
+      }
     } catch (err) {
       console.error('Evening news error:', err.message);
     }
