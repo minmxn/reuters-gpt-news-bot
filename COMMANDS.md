@@ -16,7 +16,7 @@
 | `/us` | US news |
 | `/cn` | China news |
 | `/read` | Tap-through news reader (flip stories with ◀ ▶ buttons) |
-| `/swipe` | Open the fullscreen swipe reader (Mini App; requires `WEBAPP_URL`) |
+| `/news` | Open the fullscreen news reader (Mini App; requires `WEBAPP_URL`). `/swipe` also works |
 | `/quota` | Check NewsAPI usage today (100/day limit) |
 | `/testpdf` | Generate a test PDF magazine |
 | `/schedule` | View the daily posting schedule |
@@ -55,6 +55,7 @@ sg - Singapore news
 us - US news
 cn - China news
 read - Tap-through news reader
+news - Open the fullscreen news reader
 quota - Check NewsAPI usage today
 testpdf - Generate a test PDF
 schedule - View the daily schedule
