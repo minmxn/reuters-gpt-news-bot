@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const axios = require('axios');
 const { TZ } = require('../config');
+const { generateSummaries } = require('./groq');
 
 // ─── PALETTE ──────────────────────────────────────────────────────
 const NAVY = '#1a1a2e';
@@ -29,13 +30,10 @@ function sourceName(article) {
   return (article.source && article.source.name ? article.source.name : 'Nomo Wire').toUpperCase();
 }
 
-// NewsAPI free-tier `content` ends with a "[+1234 chars]" marker — strip it.
-function cleanContent(article) {
-  const body = (article.content || '').replace(/\s*\[\+\d+\s*chars\]\s*$/i, '').trim();
-  if (!body) return '';
-  const desc = (article.description || '').trim();
-  if (desc && body.slice(0, 30) === desc.slice(0, 30)) return ''; // avoid duplicating standfirst
-  return body;
+function firstSentence(text) {
+  if (!text) return '';
+  const m = text.match(/^.*?[.!?](\s|$)/);
+  return (m ? m[0] : text).trim();
 }
 
 // Downloads an article image as a Buffer. PDFKit only supports JPEG/PNG,
@@ -57,7 +55,6 @@ async function fetchImage(url) {
 }
 
 // Draws an image cropped to fill the box, or a navy/gold placeholder.
-// frame=false skips the border (used for full-bleed cover image).
 function drawImageBox(doc, img, x, y, w, h, frame = true) {
   let drawn = false;
   if (img) {
@@ -79,44 +76,74 @@ function drawImageBox(doc, img, x, y, w, h, frame = true) {
   if (frame) doc.rect(x, y, w, h).lineWidth(0.5).strokeColor(LINE).stroke();
 }
 
+// translucent overlay rectangle
+function overlay(doc, x, y, w, h, opacity) {
+  doc.save();
+  doc.rect(x, y, w, h).fillOpacity(opacity).fill(NAVY);
+  doc.restore();
+}
+
 // ─── COVER PAGE ───────────────────────────────────────────────────
 
-function drawCover(doc, article, img, dateStr, edition) {
+function drawCover(doc, items, images, summaries, dateStr, edition) {
   const W = doc.page.width;
   const H = doc.page.height;
+  const lead = items[0];
 
-  // full-bleed lead photo
-  drawImageBox(doc, img, 0, 0, W, H, false);
+  drawImageBox(doc, images[0], 0, 0, W, H, false);
 
   // top masthead overlay
-  doc.save();
-  doc.rect(0, 0, W, 124).fillOpacity(0.58).fill(NAVY);
-  doc.restore();
-  doc.rect(0, 124, W, 4).fill(GOLD);
-  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(40)
+  overlay(doc, 0, 0, W, 128, 0.55);
+  doc.rect(0, 128, W, 4).fill(GOLD);
+  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(42)
     .text('NOMO NEWS', M, 34, { characterSpacing: 1 });
   doc.fillColor('#ffffff').font('Helvetica').fontSize(10)
-    .text('YOUR DAILY MARKETS & WORLD BRIEFING', M + 2, 84, { characterSpacing: 2.5 });
+    .text('YOUR DAILY MARKETS & WORLD BRIEFING', M + 2, 86, { characterSpacing: 2.5 });
   doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(12)
-    .text(edition.toUpperCase(), M, 40, { width: W - M * 2, align: 'right' });
+    .text(edition.toUpperCase(), M, 42, { width: W - M * 2, align: 'right' });
   doc.fillColor(MUTE).font('Helvetica').fontSize(10)
-    .text(dateStr, M, 58, { width: W - M * 2, align: 'right' });
+    .text(dateStr, M, 60, { width: W - M * 2, align: 'right' });
 
-  // bottom teaser overlay
-  const bandTop = H - 232;
-  doc.save();
-  doc.rect(0, bandTop, W, 232).fillOpacity(0.72).fill(NAVY);
-  doc.restore();
+  // bottom story + contents overlay
+  const bandTop = H - 336;
+  overlay(doc, 0, bandTop, W, 336, 0.72);
 
-  doc.rect(M, bandTop + 30, 96, 22).fill(RED);
+  let y = bandTop + 26;
+  doc.rect(M, y, 96, 22).fill(RED);
   doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10)
-    .text('TOP STORY', M, bandTop + 37, { width: 96, align: 'center', characterSpacing: 1 });
+    .text('TOP STORY', M, y + 7, { width: 96, align: 'center', characterSpacing: 1 });
+  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(9)
+    .text(sourceName(lead), M + 110, y + 7, { characterSpacing: 1.5 });
+  y += 34;
 
-  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(10)
-    .text(sourceName(article), M, bandTop + 64, { characterSpacing: 1.5 });
+  const title = truncate(lead.title, 120);
+  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(26)
+    .text(title, M, y, { width: W - M * 2, lineGap: 2 });
+  y += doc.heightOfString(title, { width: W - M * 2, lineGap: 2 }) + 8;
 
-  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(27)
-    .text(truncate(article.title, 150), M, bandTop + 82, { width: W - M * 2, lineGap: 2 });
+  const teaser = truncate(firstSentence(summaries[0]) || lead.description, 180);
+  if (teaser) {
+    doc.fillColor(GOLD).font('Times-Italic').fontSize(12.5)
+      .text(teaser, M, y, { width: W - M * 2, lineGap: 2 });
+    y += doc.heightOfString(teaser, { width: W - M * 2, lineGap: 2 }) + 12;
+  }
+
+  doc.moveTo(M, y).lineTo(W - M, y).lineWidth(1).strokeColor(GOLD).stroke();
+  y += 12;
+  doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(9)
+    .text('INSIDE THIS ISSUE', M, y, { characterSpacing: 2 });
+  y += 16;
+
+  items.slice(1, 4).forEach((a) => {
+    const line = truncate(a.title, 74);
+    doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(10).text('‣', M, y, { continued: false });
+    doc.fillColor('#ffffff').font('Helvetica').fontSize(10)
+      .text(line, M + 14, y, { width: W - M * 2 - 14 });
+    y += doc.heightOfString(line, { width: W - M * 2 - 14 }) + 6;
+  });
+
+  // gold frame
+  doc.rect(16, 16, W - 32, H - 32).lineWidth(1.5).strokeColor(GOLD).stroke();
 }
 
 // ─── STORY PAGE ───────────────────────────────────────────────────
@@ -134,24 +161,19 @@ function drawStoryMasthead(doc, edition, dateStr, idx, total) {
   return 56 + 3 + 18;
 }
 
-function drawStory(doc, article, img, dateStr, edition, idx, total) {
+function drawStory(doc, article, img, summary, dateStr, edition, idx, total) {
   const W = doc.page.width - M * 2;
   let y = drawStoryMasthead(doc, edition, dateStr, idx, total);
 
   // hero image
-  const heroH = 300;
+  const heroH = 296;
   drawImageBox(doc, img, M, y, W, heroH);
-
-  // category badge + source overlay
   doc.rect(M + 14, y + 14, 86, 20).fill(idx === 1 ? RED : NAVY);
   doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9)
     .text(idx === 1 ? 'TOP STORY' : 'BRIEFING', M + 14, y + 20, { width: 86, align: 'center', characterSpacing: 1 });
-  doc.save();
-  doc.rect(M, y + heroH - 30, W, 30).fillOpacity(0.62).fill(NAVY);
-  doc.restore();
+  overlay(doc, M, y + heroH - 30, W, 30, 0.62);
   doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(9)
     .text(sourceName(article), M + 14, y + heroH - 20, { characterSpacing: 1.5 });
-
   y += heroH + 18;
 
   // headline
@@ -160,26 +182,18 @@ function drawStory(doc, article, img, dateStr, edition, idx, total) {
     .text(title, M, y, { width: W, lineGap: 1 });
   y += doc.heightOfString(title, { width: W, lineGap: 1 }) + 8;
 
-  // meta line
+  // meta line + gold rule
   doc.fillColor(GRAY).font('Helvetica').fontSize(9.5)
     .text(`${(article.source && article.source.name) || 'Nomo Wire'}   ·   ${dateStr}`, M, y);
   y += 14;
   doc.moveTo(M, y).lineTo(M + 70, y).lineWidth(2).strokeColor(GOLD).stroke();
-  y += 14;
+  y += 16;
 
-  // standfirst (serif)
-  const standfirst = truncate(article.description, 320);
-  if (standfirst) {
+  // AI summary as the editorial body (serif)
+  const text = summary || truncate(article.description, 320);
+  if (text) {
     doc.fillColor(INK).font('Times-Roman').fontSize(13)
-      .text(standfirst, M, y, { width: W, lineGap: 3 });
-    y += doc.heightOfString(standfirst, { width: W, lineGap: 3 }) + 12;
-  }
-
-  // body paragraph (if content adds anything beyond the standfirst)
-  const body = truncate(cleanContent(article), 360);
-  if (body) {
-    doc.fillColor(GRAY).font('Helvetica').fontSize(10.5)
-      .text(body, M, y, { width: W, lineGap: 2 });
+      .text(text, M, y, { width: W, lineGap: 3.5, align: 'left' });
   }
 
   // clickable read-more pinned near the bottom
@@ -195,7 +209,15 @@ function drawStory(doc, article, img, dateStr, edition, idx, total) {
 
 async function generateNewsPDF(articles, edition) {
   const items = articles.slice(0, STORY_COUNT);
-  const images = await Promise.all(items.map(a => fetchImage(a.urlToImage)));
+
+  // Fetch images and AI summaries in parallel; both fall back gracefully.
+  const [images, summaries] = await Promise.all([
+    Promise.all(items.map(a => fetchImage(a.urlToImage))),
+    generateSummaries(items).catch(err => {
+      console.error('PDF summary generation failed, using descriptions:', err.message);
+      return [];
+    })
+  ]);
 
   return new Promise((resolve, reject) => {
     const safe = edition.toLowerCase().replace(/\s+/g, '-');
@@ -216,13 +238,11 @@ async function generateNewsPDF(articles, edition) {
       return;
     }
 
-    // Cover
-    drawCover(doc, items[0], images[0], dateStr, edition);
+    drawCover(doc, items, images, summaries, dateStr, edition);
 
-    // One full page per story
     items.forEach((article, i) => {
       doc.addPage();
-      drawStory(doc, article, images[i], dateStr, edition, i + 1, items.length);
+      drawStory(doc, article, images[i], summaries[i], dateStr, edition, i + 1, items.length);
     });
 
     // Footer band + page numbers on every page except the cover.

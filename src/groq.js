@@ -26,17 +26,17 @@ function withTimeout(promise, ms = 12000) {
 }
 
 // Asks Groq for a JSON response and parses it.
-async function groqJSON(prompt) {
+async function groqJSON(prompt, maxTokens = 1000) {
   const response = await withTimeout(axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
     {
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1000,
+      max_tokens: maxTokens,
       response_format: { type: 'json_object' }
     },
     { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
-  ));
+  ), 20000);
   return JSON.parse(response.data.choices[0].message.content);
 }
 
@@ -100,4 +100,29 @@ Keep each option under 90 characters. Make the last option a lighthearted or neu
   return p;
 }
 
-module.exports = { askGroq, generateMCQSet, generatePoll };
+// Writes a clear 2-3 sentence editorial summary for each article, in one
+// batched call. Returns an array of strings in the same order as `articles`.
+// Throws on failure so the PDF builder can fall back to the description.
+async function generateSummaries(articles) {
+  const list = articles.map((a, i) =>
+    `${i + 1}. ${a.title || 'Untitled'} — ${(a.description || '').slice(0, 240)}`
+  ).join('\n');
+
+  const prompt = `You are the editor of a daily markets and world-news magazine. For each numbered article below, write a clear, engaging 2-3 sentence summary in plain English that a general reader can understand. Be factual and neutral — do not invent details beyond the title and description.
+
+Articles:
+${list}
+
+Respond ONLY with valid JSON in exactly this shape:
+{ "summaries": ["summary for article 1", "summary for article 2", "... one entry per article, same order"] }
+Provide exactly ${articles.length} summaries.`;
+
+  const data = await groqJSON(prompt, 2200);
+  const s = data && data.summaries;
+  const valid = Array.isArray(s) && s.length === articles.length &&
+    s.every(x => typeof x === 'string' && x.trim().length > 0);
+  if (!valid) throw new Error('Malformed summaries from Groq');
+  return s.map(x => x.trim());
+}
+
+module.exports = { askGroq, generateMCQSet, generatePoll, generateSummaries };
