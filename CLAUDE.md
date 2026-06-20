@@ -34,6 +34,8 @@ Validated at startup in [config.js](config.js) — the process exits with a clea
 | `CHAT_ID` | recommended | Target chat/channel for scheduled posts |
 | `BOT_USERNAME` | optional | Defaults to `nomogh_bot` (used for group mention/reply detection) |
 | `READER_STORE` | optional | Path for persisted reader sessions; point at a Railway volume (e.g. `/data/reader-sessions.json`) to survive redeploys |
+| `WEBAPP_URL` | optional | Public HTTPS URL of the Mini App (the Railway domain). When set, enables the `/swipe` launch button + menu button |
+| `PORT` | optional | Web server port (Railway sets this automatically; defaults to 3000 locally) |
 
 ## Architecture
 
@@ -49,6 +51,8 @@ bot.js
 │   │                      keyboard, the /schedule text, MCQ fallback picker
 │   ├── reader.js          registerReader(bot) + startReader() — the /read
 │   │                      swipeable carousel (inline-button navigation)
+│   ├── webserver.js       startWebServer() — Express server for the Mini App:
+│   │                      serves public/ and GET /api/stories (cached 10 min)
 │   ├── news.js            NewsAPI fetchers + blocked-domain filtering
 │   ├── groq.js            askGroq + generateSummaries / generateMCQSet /
 │   │                      generatePoll (JSON mode, with timeout)
@@ -56,9 +60,12 @@ bot.js
 │   ├── quota.js           in-memory daily NewsAPI call counter
 │   └── helpers.js         escapeMarkdown, truncate, buildNewsBody, formatNews,
 │                          shouldRespond, cleanMessage
-└── data/
-    ├── polls.js           dailyPolls (per weekday) + weeklyQuestions
-    └── mcq.js             mcqQuestions (hardcoded fallback) + mcqState
+├── data/
+│   ├── polls.js           dailyPolls (per weekday) + weeklyQuestions
+│   └── mcq.js             mcqQuestions (hardcoded fallback) + mcqState
+└── public/
+    └── index.html         Mini App — fullscreen swipeable card reader
+                           (Telegram WebApp SDK, CSS scroll-snap, /api/stories)
 ```
 
 ### Data flow (scheduled post)

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Nomo News</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { --navy:#1a1a2e; --gold:#FFD700; --ink:#0e0e16; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; height:100%; background:var(--ink); color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; overflow:hidden; }
+  #status { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:24px; color:#cfcfe0; font-size:15px; }
+  .deck { display:flex; height:100vh; height:100dvh; overflow-x:auto; overflow-y:hidden;
+    scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .deck::-webkit-scrollbar { display:none; }
+  .card { position:relative; min-width:100vw; width:100vw; height:100vh; height:100dvh;
+    scroll-snap-align:center; scroll-snap-stop:always; display:flex; flex-direction:column; }
+  .photo { height:52vh; height:52dvh; background-size:cover; background-position:center;
+    background-color:var(--navy); position:relative; flex-shrink:0; }
+  .photo::after { content:""; position:absolute; left:0; right:0; bottom:0; height:90px;
+    background:linear-gradient(to top, rgba(14,14,22,1), rgba(14,14,22,0)); }
+  .badge { position:absolute; top:16px; left:16px; background:#E12828; color:#fff;
+    font-size:11px; font-weight:600; letter-spacing:1px; padding:5px 11px; border-radius:6px; z-index:2; }
+  .counter { position:absolute; top:16px; right:16px; background:rgba(0,0,0,0.45); color:#fff;
+    font-size:12px; font-weight:600; padding:5px 11px; border-radius:20px; z-index:2; }
+  .body { flex:1; padding:18px 22px 26px; display:flex; flex-direction:column; overflow:hidden; }
+  .src { color:var(--gold); font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; }
+  .headline { font-size:23px; font-weight:600; line-height:1.22; margin:8px 0 0; }
+  .summary { font-size:15.5px; line-height:1.62; color:#d7d7e0; margin:14px 0 0; overflow-y:auto; }
+  .read { margin-top:auto; padding-top:16px; }
+  .read a { color:var(--gold); font-size:15px; font-weight:600; text-decoration:none;
+    border-bottom:2px solid var(--gold); padding-bottom:3px; }
+  .hint { position:fixed; bottom:14px; left:0; right:0; text-align:center; color:#8a8a99;
+    font-size:12px; pointer-events:none; transition:opacity .4s; }
+</style>
+</head>
+<body>
+  <div id="status">Loading the latest stories…</div>
+  <div class="deck" id="deck" hidden></div>
+  <div class="hint" id="hint" hidden>Swipe ← → for more stories</div>
+
+<script>
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor('#1a1a2e'); tg.setBackgroundColor && tg.setBackgroundColor('#0e0e16'); }
+
+  function esc(s) { return String(s || '').replace(/[&<>"]/g, function (c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+
+  function openLink(url) { if (tg && tg.openLink) tg.openLink(url); else window.open(url, '_blank'); }
+
+  function render(stories) {
+    var deck = document.getElementById('deck');
+    var total = stories.length;
+    deck.innerHTML = stories.map(function (s, i) {
+      var photo = s.image
+        ? 'style="background-image:url(\'' + esc(s.image) + '\')"'
+        : '';
+      var badge = i === 0 ? 'TOP STORY' : 'BRIEFING';
+      var read = s.url
+        ? '<div class="read"><a href="#" onclick="openLink(\'' + esc(s.url) + '\');return false;">Read the full story ›</a></div>'
+        : '';
+      return '<section class="card">'
+        + '<div class="photo" ' + photo + '>'
+        + '<span class="badge">' + badge + '</span>'
+        + '<span class="counter">' + (i + 1) + ' / ' + total + '</span>'
+        + '</div>'
+        + '<div class="body">'
+        + '<div class="src">' + esc(s.source) + '</div>'
+        + '<h1 class="headline">' + esc(s.title) + '</h1>'
+        + '<p class="summary">' + esc(s.summary) + '</p>'
+        + read
+        + '</div>'
+        + '</section>';
+    }).join('');
+    document.getElementById('status').hidden = true;
+    deck.hidden = false;
+    var hint = document.getElementById('hint');
+    if (total > 1) { hint.hidden = false; setTimeout(function () { hint.style.opacity = '0'; }, 3500); }
+
+    var lastIndex = 0;
+    deck.addEventListener('scroll', function () {
+      var idx = Math.round(deck.scrollLeft / window.innerWidth);
+      if (idx !== lastIndex) { lastIndex = idx; if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); }
+    }, { passive: true });
+  }
+
+  fetch('/api/stories')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.stories && d.stories.length) render(d.stories);
+      else document.getElementById('status').textContent = 'No news available right now. Try again later.';
+    })
+    .catch(function () {
+      document.getElementById('status').textContent = 'Could not load stories. Please try again.';
+    });
+</script>
+</body>
+</html>
