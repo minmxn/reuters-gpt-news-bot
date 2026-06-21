@@ -182,7 +182,7 @@ function registerCommands(bot) {
     const question = cleanMessage(text);
     if (!question) return;
 
-    bot.sendMessage(chatId, '🤔 Thinking...');
+    bot.sendChatAction(chatId, 'typing').catch(() => {});
     try {
       const answer = await askGroq(question);
       bot.sendMessage(chatId, `🤖 ${answer}`, { parse_mode: 'Markdown' });
