@@ -36,6 +36,7 @@ Validated at startup in [config.js](config.js) — the process exits with a clea
 | `READER_STORE` | optional | Path for persisted reader sessions; point at a Railway volume (e.g. `/data/reader-sessions.json`) to survive redeploys |
 | `WEBAPP_URL` | optional | Public HTTPS URL of the Mini App (the Railway domain). When set, enables the `/swipe` launch button + menu button |
 | `PORT` | optional | Web server port (Railway sets this automatically; defaults to 3000 locally) |
+| `MEMORY_STORE` | optional | Path for persisted per-user chat memory; point at a Railway volume to survive redeploys |
 
 ## Architecture
 
@@ -62,6 +63,8 @@ bot.js
 │   │                      generatePoll (JSON mode, with timeout)
 │   ├── pdf.js             generateNewsPDF() — magazine PDF (cover + stories)
 │   ├── quota.js           in-memory daily NewsAPI call counter
+│   ├── memory.js          per-user chat memory (10 exchanges, 60-min idle,
+│   │                      persisted to MEMORY_STORE) for the free-text Q&A
 │   └── helpers.js         escapeMarkdown, truncate, buildNewsBody, formatNews,
 │                          shouldRespond, cleanMessage
 ├── data/
@@ -79,7 +82,7 @@ bot.js
 
 ### Key registrars
 
-- **commands.js** — `/start`, `/markets`, `/world`, `/tech`, `/briefing`, `/mood`, `/search`, `/stock`, `/sg`, `/us`, `/cn`, `/read`, `/quota`, `/testpdf`, `/schedule`, plus reply-keyboard buttons and an AI fallback for free-text questions. See [COMMANDS.md](COMMANDS.md).
+- **commands.js** — `/start`, `/markets`, `/world`, `/tech`, `/briefing`, `/mood`, `/search`, `/stock`, `/sg`, `/us`, `/cn`, `/read`, `/quota`, `/reset`, `/testpdf`, `/schedule`, plus reply-keyboard buttons and an AI fallback for free-text questions. The free-text Q&A uses `chatGroq` with per-user memory ([memory.js](src/memory.js)) and reply-context (anchors to the message a user replied to). See [COMMANDS.md](COMMANDS.md).
 - **scheduler.js** — cron jobs (see schedule below). `postNewsUpdate()` posts the carousel; `fallbackMCQSet()` rotates hardcoded questions when Groq is unavailable.
 - **reader.js** — the carousel. Sessions (articles + summaries + cached Telegram `file_id`s) live in a `Map`, persisted to `READER_STORE` (24h TTL). Images are pre-downloaded so `Next`/`Prev` (via `editMessageMedia`) are fast; cached `file_id`s make repeat views instant. Image source order: cached file_id → buffer → URL → placeholder.
 

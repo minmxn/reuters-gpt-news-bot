@@ -17,6 +17,7 @@
 | `/cn` | China news |
 | `/read` | Tap-through news reader (flip stories with ◀ ▶ buttons) |
 | `/news` | Open the fullscreen news reader (Mini App; requires `WEBAPP_URL`). `/swipe` also works |
+| `/reset` | Clear your conversation memory with the bot (start a fresh thread) |
 | `/quota` | Check NewsAPI usage today (100/day limit) |
 | `/testpdf` | Generate a test PDF magazine |
 | `/schedule` | View the daily posting schedule |
@@ -56,6 +57,7 @@ us - US news
 cn - China news
 read - Tap-through news reader
 news - Open the fullscreen news reader
+reset - Clear your conversation memory
 quota - Check NewsAPI usage today
 testpdf - Generate a test PDF
 schedule - View the daily schedule

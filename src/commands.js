@@ -1,11 +1,12 @@
 const fs = require('fs');
 const { fetchNews, fetchNewsByKeyword, fetchNewsByCountry, fetchCombinedNews } = require('./news');
-const { askGroq } = require('./groq');
+const { askGroq, chatGroq } = require('./groq');
 const { generateNewsPDF } = require('./pdf');
-const { formatNews, shouldRespond, cleanMessage } = require('./helpers');
+const { formatNews, shouldRespond, cleanMessage, truncate } = require('./helpers');
 const { DAILY_LIMIT, getQuota } = require('./quota');
 const { BOT_USERNAME } = require('../config');
 const { scheduleText, mainKeyboard } = require('./scheduler');
+const memory = require('./memory');
 
 function registerCommands(bot) {
   bot.onText(/\/start/, (msg) => {
@@ -170,6 +171,12 @@ function registerCommands(bot) {
     );
   });
 
+  // Clears the asker's conversation memory.
+  bot.onText(/\/reset/, (msg) => {
+    memory.reset(msg.chat.id, msg.from && msg.from.id);
+    bot.sendMessage(msg.chat.id, '🧹 Memory cleared — starting fresh.');
+  });
+
   bot.on('message', async (msg) => {
     const text = msg.text;
     if (!text) return;
@@ -179,13 +186,22 @@ function registerCommands(bot) {
     if (!shouldRespond(msg)) return;
 
     const chatId = msg.chat.id;
+    const userId = msg.from && msg.from.id;
     const question = cleanMessage(text);
     if (!question) return;
 
+    // Reply-context: if the user replied to a message, anchor the answer to it.
+    const repliedText = msg.reply_to_message && msg.reply_to_message.text;
+    const prompt = repliedText
+      ? `(Replying to: "${truncate(repliedText, 400)}")\n\n${question}`
+      : question;
+
     bot.sendChatAction(chatId, 'typing').catch(() => {});
     try {
-      const answer = await askGroq(question);
+      const history = memory.getHistory(chatId, userId);
+      const answer = await chatGroq(history, prompt);
       bot.sendMessage(chatId, `🤖 ${answer}`, { parse_mode: 'Markdown' });
+      memory.append(chatId, userId, question, answer);
     } catch (err) {
       bot.sendMessage(chatId, `😬 Could not answer that. Error: ${err.message}`);
     }

@@ -4,16 +4,35 @@ const { GROQ_API_KEY } = require('../config');
 // Attribution shown wherever an AI-generated summary is displayed.
 const AI_CREDIT = 'Summarised by Groq AI';
 
-async function askGroq(question, newsContext = '') {
-  const prompt = `You are a witty, friendly financial and geopolitical news analyst built by MIN.
+// Shared persona for free-text Q&A.
+const PERSONA = `You are a witty, friendly financial and geopolitical news analyst built by MIN.
 You explain complex news in plain simple English that anyone can understand.
-Keep answers concise, clear and occasionally add a light humorous remark.
+Keep answers concise, clear and occasionally add a light humorous remark.`;
+
+async function askGroq(question, newsContext = '') {
+  const prompt = `${PERSONA}
 ${newsContext ? `\nLatest news context:\n${newsContext}\n` : ''}
 Question: ${question}`;
 
   const response = await axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
     { model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], max_tokens: 1000 },
+    { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
+  );
+  return response.data.choices[0].message.content;
+}
+
+// Multi-turn chat completion: caller passes a messages array (the system
+// persona is prepended here). Used for the free-text Q&A with memory.
+async function chatGroq(history, question) {
+  const messages = [
+    { role: 'system', content: PERSONA },
+    ...history,
+    { role: 'user', content: question }
+  ];
+  const response = await axios.post(
+    'https://api.groq.com/openai/v1/chat/completions',
+    { model: 'llama-3.3-70b-versatile', messages, max_tokens: 1000 },
     { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
   );
   return response.data.choices[0].message.content;
@@ -135,4 +154,4 @@ Provide exactly ${articles.length} summaries.`;
   return s.map(x => x.trim());
 }
 
-module.exports = { askGroq, generateMCQSet, generatePoll, generateSummaries, AI_CREDIT };
+module.exports = { askGroq, chatGroq, generateMCQSet, generatePoll, generateSummaries, AI_CREDIT };
