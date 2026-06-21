@@ -15,13 +15,25 @@ const BLOCKED_DOMAINS = [
 // affiliate blogs. (Not applied to /search and /stock so niche lookups can
 // still pull from anywhere.)
 const TRUSTED_SOURCES = [
-  'reuters.com', 'apnews.com', 'bloomberg.com', 'cnbc.com', 'ft.com',
-  'wsj.com', 'bbc.com', 'bbc.co.uk', 'theguardian.com', 'marketwatch.com',
+  // Wires & global
+  'reuters.com', 'apnews.com', 'bbc.com', 'bbc.co.uk', 'theguardian.com',
+  'aljazeera.com', 'dw.com', 'france24.com', 'independent.co.uk',
+  'telegraph.co.uk', 'news.sky.com',
+  // US general
+  'nytimes.com', 'washingtonpost.com', 'cnn.com', 'nbcnews.com',
+  'abcnews.go.com', 'cbsnews.com', 'usatoday.com', 'npr.org',
+  'thehill.com', 'politico.com', 'time.com', 'newsweek.com', 'vox.com',
+  // Business & markets
+  'bloomberg.com', 'cnbc.com', 'ft.com', 'wsj.com', 'marketwatch.com',
   'businessinsider.com', 'forbes.com', 'economist.com', 'axios.com',
-  'fortune.com', 'barrons.com', 'nytimes.com', 'washingtonpost.com',
-  'aljazeera.com', 'channelnewsasia.com', 'straitstimes.com',
-  'asia.nikkei.com', 'businesstimes.com.sg',
-  'techcrunch.com', 'theverge.com', 'arstechnica.com', 'wired.com'
+  'fortune.com', 'barrons.com', 'investopedia.com', 'qz.com',
+  // Asia / Singapore
+  'channelnewsasia.com', 'straitstimes.com', 'asia.nikkei.com',
+  'businesstimes.com.sg', 'scmp.com', 'japantimes.co.jp',
+  'thestar.com.my', 'bangkokpost.com',
+  // Tech
+  'techcrunch.com', 'theverge.com', 'arstechnica.com', 'wired.com',
+  'engadget.com', 'zdnet.com', 'cnet.com', 'venturebeat.com'
 ].join(',');
 
 function isCleanArticle(article) {
