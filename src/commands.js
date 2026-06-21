@@ -182,12 +182,10 @@ function registerCommands(bot) {
     const question = cleanMessage(text);
     if (!question) return;
 
-    bot.sendMessage(chatId, '🤔 On it — checking the latest news for you...');
+    bot.sendMessage(chatId, '🤔 Thinking...');
     try {
-      const articles = await fetchNews('markets');
-      const newsContext = articles.map(a => a.title).join('\n');
-      const answer = await askGroq(question, newsContext);
-      bot.sendMessage(chatId, `🤖 *Here is what I found:*\n\n${answer}`, { parse_mode: 'Markdown' });
+      const answer = await askGroq(question);
+      bot.sendMessage(chatId, `🤖 ${answer}`, { parse_mode: 'Markdown' });
     } catch (err) {
       bot.sendMessage(chatId, `😬 Could not answer that. Error: ${err.message}`);
     }
