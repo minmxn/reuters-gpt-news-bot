@@ -10,32 +10,6 @@ const BLOCKED_DOMAINS = [
   'medium.com',   // blog platform, inconsistent quality
 ];
 
-// Reputable news outlets. Passed to NewsAPI's `domains` param so the main
-// feed and category commands only ever return real journalism — not SEO /
-// affiliate blogs. (Not applied to /search and /stock so niche lookups can
-// still pull from anywhere.)
-const TRUSTED_SOURCES = [
-  // Wires & global
-  'reuters.com', 'apnews.com', 'bbc.com', 'bbc.co.uk', 'theguardian.com',
-  'aljazeera.com', 'dw.com', 'france24.com', 'independent.co.uk',
-  'telegraph.co.uk', 'news.sky.com',
-  // US general
-  'nytimes.com', 'washingtonpost.com', 'cnn.com', 'nbcnews.com',
-  'abcnews.go.com', 'cbsnews.com', 'usatoday.com', 'npr.org',
-  'thehill.com', 'politico.com', 'time.com', 'newsweek.com', 'vox.com',
-  // Business & markets
-  'bloomberg.com', 'cnbc.com', 'ft.com', 'wsj.com', 'marketwatch.com',
-  'businessinsider.com', 'forbes.com', 'economist.com', 'axios.com',
-  'fortune.com', 'barrons.com', 'investopedia.com', 'qz.com',
-  // Asia / Singapore
-  'channelnewsasia.com', 'straitstimes.com', 'asia.nikkei.com',
-  'businesstimes.com.sg', 'scmp.com', 'japantimes.co.jp',
-  'thestar.com.my', 'bangkokpost.com',
-  // Tech
-  'techcrunch.com', 'theverge.com', 'arstechnica.com', 'wired.com',
-  'engadget.com', 'zdnet.com', 'cnet.com', 'venturebeat.com'
-].join(',');
-
 function isCleanArticle(article) {
   if (!article || !article.url) return false;
   try {
@@ -59,7 +33,7 @@ async function fetchNews(category, pageSize = 10) {
   };
   trackApiCall();
   const response = await axios.get('https://newsapi.org/v2/everything', {
-    params: { q: queries[category], domains: TRUSTED_SOURCES, language: 'en', sortBy: 'publishedAt', pageSize: pageSize + 6, apiKey: NEWS_API_KEY }
+    params: { q: queries[category], language: 'en', sortBy: 'publishedAt', pageSize: pageSize + 6, apiKey: NEWS_API_KEY }
   });
   return filterArticles(response.data.articles).slice(0, pageSize);
 }
@@ -90,7 +64,6 @@ async function fetchCombinedNews(pageSize = 15, sortBy = 'popularity') {
   const response = await axios.get('https://newsapi.org/v2/everything', {
     params: {
       q: 'stock market OR geopolitics OR artificial intelligence OR economy',
-      domains: TRUSTED_SOURCES,
       language: 'en',
       sortBy,
       pageSize: Math.min(pageSize + 10, 100),
