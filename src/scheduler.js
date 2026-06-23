@@ -6,6 +6,7 @@ const { startReader } = require('./reader');
 const { sendTopStoriesTeaser } = require('./teaser');
 const { dailyPolls } = require('../data/polls');
 const { mcqQuestions, mcqState } = require('../data/mcq');
+const mcqHistory = require('./mcqHistory');
 
 // ─── KEYBOARD ─────────────────────────────────────────────────────
 
@@ -47,20 +48,17 @@ const scheduleText =
 _BUILT BY MIN_ ⚡`;
 
 // ─── MCQ FALLBACK ─────────────────────────────────────────────────
-// Picks one Easy, one Medium and one Hard question from the hardcoded
-// set, rotating through them so the same trio isn't repeated daily.
+// Picks one Easy, one Medium and one Hard question from the hardcoded set.
+// Rotation is keyed to the calendar day so it advances daily even after a
+// restart/redeploy (an in-memory counter would reset and repeat).
 
 function fallbackMCQSet() {
-  const pick = (level, offset) => {
+  const dayNum = Math.floor(Date.now() / 86400000); // days since epoch (SGT-ish)
+  const pick = (level) => {
     const pool = mcqQuestions.filter(q => q.level === level);
-    return pool[offset % pool.length];
+    return pool[dayNum % pool.length];
   };
-  const i = mcqState.currentMCQIndex++;
-  return [
-    pick('🟢 Easy', i),
-    pick('🟡 Medium', i),
-    pick('🔴 Hard', i)
-  ];
+  return [pick('🟢 Easy'), pick('🟡 Medium'), pick('🔴 Hard')];
 }
 
 // ─── NEWS UPDATE HELPER (posts the swipeable story reader) ────────
@@ -128,9 +126,13 @@ function registerScheduler(bot) {
   cron.schedule('0 10 * * *', async () => {
     try {
       try {
-        const articles = await fetchCombinedNews(15);
+        // Pull a wide pool of the newest stories (still 1 NewsAPI call) so
+        // there's fresh material to pick from, and hand Groq the recent
+        // questions to steer it off repeated topics.
+        const articles = await fetchCombinedNews(50, 'publishedAt');
         const headlines = articles.map(a => a.title).join('\n');
-        mcqState.currentMCQs = await generateMCQSet(headlines);
+        mcqState.currentMCQs = await generateMCQSet(headlines, mcqHistory.recent());
+        mcqHistory.record(mcqState.currentMCQs);
       } catch (genErr) {
         console.error('AI MCQ generation failed, using fallback:', genErr.message);
         mcqState.currentMCQs = fallbackMCQSet();

@@ -47,14 +47,16 @@ function withTimeout(promise, ms = 12000) {
   ]);
 }
 
-// Asks Groq for a JSON response and parses it.
-async function groqJSON(prompt, maxTokens = 1000) {
+// Asks Groq for a JSON response and parses it. A higher temperature yields
+// more varied wording/angles (used by the MCQ generator to avoid repeats).
+async function groqJSON(prompt, maxTokens = 1000, temperature = 1) {
   const response = await withTimeout(axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
     {
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: maxTokens,
+      temperature,
       response_format: { type: 'json_object' }
     },
     { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
@@ -63,27 +65,39 @@ async function groqJSON(prompt, maxTokens = 1000) {
 }
 
 // Validates one MCQ object has the expected shape.
-function isValidMCQ(q, expectedLevel) {
+function isValidMCQ(q) {
   return q && q.question && q.explanation &&
     Array.isArray(q.options) && q.options.length === 4 &&
-    ['A', 'B', 'C', 'D'].includes(q.answer) &&
-    q.level === expectedLevel;
+    ['A', 'B', 'C', 'D'].includes(q.answer);
 }
 
 // Generates a set of three fresh MCQs (Easy, Medium, Hard) based on
-// recent headlines. Throws if Groq is down/slow or returns malformed
-// questions — the caller is expected to fall back to hardcoded ones.
-async function generateMCQSet(headlines) {
+// recent headlines. `recentQuestions` is an avoid-list of recently-asked
+// question texts (see mcqHistory.js) so Groq doesn't reuse the same topics.
+// Throws if Groq is down/slow or returns malformed questions — the caller
+// is expected to fall back to hardcoded ones.
+async function generateMCQSet(headlines, recentQuestions = []) {
+  const avoidBlock = recentQuestions.length
+    ? `\n────────────────────────────────────────
+🚫 BANNED SUBJECTS — these questions were already asked on recent days:
+${recentQuestions.map(q => `- ${q}`).join('\n')}
+
+HARD RULE: every one of your three questions must be about a DIFFERENT subject from every banned question above. A subject is banned even if you reword it, change the difficulty, flip the angle, or focus on a different detail of the same company / event / asset / metric. If a headline below relates to any banned subject (e.g. the same company, the same conflict, the same IPO, the same commodity), SKIP that headline and choose a different one. There are many headlines — use the less obvious ones.
+────────────────────────────────────────\n`
+    : '';
+
   const prompt = `You are a financial educator creating a daily quiz for a markets/news Telegram channel.
 Based on these recent headlines, create THREE multiple-choice questions connected to the news, at three clearly different difficulty levels:
 - 🟢 Easy: beginner-friendly, tests one basic concept.
 - 🟡 Medium: intermediate, needs real understanding of how something works.
 - 🔴 Hard: genuinely difficult, expert/CFA-professional level — use applied reasoning, mechanisms, second-order effects or a short numerical/scenario problem, with subtle distractors. This question should challenge even finance professionals.
+
+IMPORTANT — vary the topics: tie ALL THREE questions (the Easy one included) to a specific company, asset, market, region or event mentioned in TODAY'S headlines below. Do NOT fall back on generic evergreen textbook questions (e.g. "what does the S&P 500 track", "what does GDP stand for") — pick fresh angles that would differ from day to day.
 Each question must be self-contained (do not assume the reader saw a specific article).
 
 Recent headlines:
 ${headlines}
-
+${avoidBlock}
 Respond ONLY with valid JSON in exactly this shape:
 {
   "questions": [
@@ -94,12 +108,15 @@ Respond ONLY with valid JSON in exactly this shape:
 }
 Make every option plausible and tempting — NO joke, silly, or filler answers. Aim for genuinely challenging questions that test real understanding and application, not just definitions; the wrong options should be common misconceptions. Keep each option under 90 characters.`;
 
-  const data = await groqJSON(prompt);
+  // Higher temperature → more varied wording and angles day to day.
+  const data = await groqJSON(prompt, 1000, 1.1);
   const qs = data && data.questions;
-  const levels = ['🟢 Easy', '🟡 Medium', '🔴 Hard'];
-  const valid = Array.isArray(qs) && qs.length === 3 &&
-    qs.every((q, i) => isValidMCQ(q, levels[i]));
+  const valid = Array.isArray(qs) && qs.length === 3 && qs.every(isValidMCQ);
   if (!valid) throw new Error('Malformed MCQ set from Groq');
+  // Force canonical level labels by position so a slightly off label from
+  // the model doesn't matter (and the 3 tiers are always Easy/Medium/Hard).
+  const levels = ['🟢 Easy', '🟡 Medium', '🔴 Hard'];
+  qs.forEach((q, i) => { q.level = levels[i]; });
   return qs;
 }
 

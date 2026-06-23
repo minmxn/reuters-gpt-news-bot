@@ -39,6 +39,7 @@ Validated at startup in [config.js](config.js) — the process exits with a clea
 | `MEMORY_STORE` | optional | Path for persisted per-user chat memory; point at a Railway volume to survive redeploys |
 | `BLOCKLIST_STORE` | optional | Path for the persisted runtime domain blocklist; point at a Railway volume to survive redeploys |
 | `ADMIN_ID` | optional | Telegram user id allowed to run `/block` and `/unblock`. If unset, anyone can manage the blocklist |
+| `MCQ_HISTORY_STORE` | optional | Path for the persisted recent-MCQ history (the avoid-list that stops repeated quiz questions); point at a Railway volume to survive redeploys |
 
 ## Architecture
 
