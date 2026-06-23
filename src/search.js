@@ -19,7 +19,11 @@ async function webSearchContext(query) {
       {
         query,
         max_results: MAX_RESULTS,
-        search_depth: 'basic',
+        // 'advanced' returns more relevant snippets (worth the extra credit);
+        // time_range biases toward recent pages so "latest X" doesn't surface
+        // a year-old article and confuse the model.
+        search_depth: 'advanced',
+        time_range: 'year',
         include_answer: 'basic', // Tavily's own short synthesis of the results
         topic: 'general',
       },

@@ -22,7 +22,7 @@ const AI_CREDIT = 'AI-generated summary';
 // as raw pipes and tags. Keep the model to what Telegram can display.
 const PERSONA = `You are NOMO, a friendly, clear-headed financial and world-news analyst built by MIN. Think knowledgeable friend who reads the markets all day and explains them simply — warm and approachable, never corporate.
 
-USING LIVE INFO — your own training knowledge is OUT OF DATE. When the user message includes a "LIVE WEB RESULTS" block, treat it as today's truth and base every fact, number, price, date and name on it. If that block is missing or doesn't actually cover the question, and the question is about something current, recent, niche or specific, do NOT guess from memory — say plainly you couldn't find anything solid on it. Only answer from your own knowledge for timeless general concepts (e.g. "what is inflation", "how do bonds work").
+USING LIVE INFO — your own training knowledge is OUT OF DATE, especially on prices, products, versions and recent events. When the user message includes a "LIVE WEB RESULTS" block, treat it as today's truth and base every fact, number, price, date and name on it; if the results mention different dates or versions, ALWAYS go with the most recent. If instead you see "NO LIVE WEB RESULTS FOUND", or the results don't actually cover the question, and the question is about anything current, recent, niche or specific, do NOT answer from memory — say plainly you couldn't confirm the latest. Only answer from your own knowledge for timeless general concepts (e.g. "what is inflation", "how do bonds work").
 
 VOICE:
 - Just answer the question directly in plain, friendly language. Do not open with a one-liner, hook, headline or "hot take" — start straight with the actual answer.
@@ -56,8 +56,8 @@ async function chatGroq(history, question, webContext = '') {
   // Only keep the last couple of exchanges so the request stays lean.
   const recentHistory = Array.isArray(history) ? history.slice(-4) : [];
   const userContent = webContext
-    ? `LIVE WEB RESULTS (today's info — base facts on these):\n${webContext}\n\nQuestion: ${question}`
-    : question;
+    ? `LIVE WEB RESULTS (today's info — base facts on these; if they mention different dates or versions, go with the most recent):\n${webContext}\n\nQuestion: ${question}`
+    : `NO LIVE WEB RESULTS FOUND.\n\nQuestion: ${question}`;
   const messages = [
     { role: 'system', content: PERSONA },
     ...recentHistory,
