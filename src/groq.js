@@ -12,6 +12,12 @@ const MODEL = 'openai/gpt-oss-120b';
 // quizzes, polls, news Q&A) don't need deep reasoning, so keep it low.
 const REASONING_EFFORT = 'low';
 
+// Free-text Q&A runs on Groq's agentic "compound" system, which can search
+// the live web automatically — so it answers about recent/niche topics from
+// real sources instead of hallucinating from a stale training cutoff.
+// NOTE: compound does NOT accept reasoning_effort (it 400s), so don't send it.
+const CHAT_MODEL = 'groq/compound-mini';
+
 // Attribution shown wherever an AI-generated summary is displayed.
 const AI_CREDIT = 'Summarised by Groq AI';
 
@@ -25,6 +31,8 @@ VOICE:
 - Open with a punchy one-liner, hot take or analogy, THEN give the substance.
 - Be genuinely funny — sharp analogies, dry wit, a cheeky roast. No corny dad-joke filler, no forced emojis.
 - Talk like a real person, not a textbook or a press release. Have an opinion; don't hedge everything.
+
+HONESTY — never make up facts. Do NOT invent specific numbers, prices, dates, statistics, product details or events. If you searched the web, base your answer on what you actually found. If you don't know, can't confirm something, or it's too recent/niche, just say so plainly — a quick witty "couldn't find anything solid on that" beats a confident wrong answer.
 
 LENGTH — short and snappy. Default to 2-4 sentences. If you must list, a quick intro line plus at most 3 tight bullets — never a long multi-section breakdown with labelled categories. Only go long if the user explicitly asks for a deep dive or full comparison.
 
@@ -45,6 +53,8 @@ Question: ${question}`;
 
 // Multi-turn chat completion: caller passes a messages array (the system
 // persona is prepended here). Used for the free-text Q&A with memory.
+// Runs on CHAT_MODEL (compound), which web-searches when a question needs
+// current info — no reasoning_effort param (compound rejects it).
 async function chatGroq(history, question) {
   const messages = [
     { role: 'system', content: PERSONA },
@@ -55,7 +65,7 @@ async function chatGroq(history, question) {
     'https://api.groq.com/openai/v1/chat/completions',
     // Brevity is enforced by the persona; this is just a safety ceiling that
     // still lets an explicit "deep dive" finish without truncating mid-sentence.
-    { model: MODEL, messages, max_tokens: 900, reasoning_effort: REASONING_EFFORT },
+    { model: CHAT_MODEL, messages, max_tokens: 900 },
     { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
   );
   return response.data.choices[0].message.content;
