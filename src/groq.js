@@ -13,7 +13,8 @@ const MODEL = 'openai/gpt-oss-120b';
 const REASONING_EFFORT = 'low';
 
 // Attribution shown wherever an AI-generated summary is displayed.
-const AI_CREDIT = 'Summarised by Groq AI';
+// Kept provider-agnostic so it stays accurate if the model/host changes.
+const AI_CREDIT = 'AI-generated summary';
 
 // Shared persona for free-text Q&A.
 // The formatting rules matter: replies are sent in a Telegram chat, which

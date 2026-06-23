@@ -10,7 +10,8 @@ A Telegram news bot ("BUILT BY MIN") that fetches financial/world/tech news, sum
 - **node-cron** — scheduled posts (all times Asia/Singapore)
 - **pdfkit** — PDF magazine generation
 - **NewsAPI** (newsapi.org) — news source (free tier: 100 calls/day, ~24h article delay)
-- **Groq** (llama-3.3-70b) — AI summaries, briefings, polls, quizzes
+- **Groq** (runs `openai/gpt-oss-120b`) — AI summaries, briefings, polls, quizzes, and the free-text Q&A
+- **Tavily** (tavily.com) — web search that grounds the free-text Q&A in live info
 - Deployed on **Railway** (auto-deploys from `main`)
 
 ## Run
