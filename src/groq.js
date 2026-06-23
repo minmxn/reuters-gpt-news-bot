@@ -75,7 +75,11 @@ function isValidMCQ(q, expectedLevel) {
 // questions — the caller is expected to fall back to hardcoded ones.
 async function generateMCQSet(headlines) {
   const prompt = `You are a financial educator creating a daily quiz for a markets/news Telegram channel.
-Based on these recent headlines, create THREE multiple-choice questions — one 🟢 Easy, one 🟡 Medium, one 🔴 Hard — that each teach a useful finance, economics, markets or geopolitics concept connected to the news. Each question must be self-contained (do not assume the reader saw a specific article).
+Based on these recent headlines, create THREE multiple-choice questions connected to the news, at three clearly different difficulty levels:
+- 🟢 Easy: beginner-friendly, tests one basic concept.
+- 🟡 Medium: intermediate, needs real understanding of how something works.
+- 🔴 Hard: genuinely difficult, expert/CFA-professional level — use applied reasoning, mechanisms, second-order effects or a short numerical/scenario problem, with subtle distractors. This question should challenge even finance professionals.
+Each question must be self-contained (do not assume the reader saw a specific article).
 
 Recent headlines:
 ${headlines}
