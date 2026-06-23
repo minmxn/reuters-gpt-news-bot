@@ -37,6 +37,8 @@ Validated at startup in [config.js](config.js) — the process exits with a clea
 | `WEBAPP_URL` | optional | Public HTTPS URL of the Mini App (the Railway domain). When set, enables the `/swipe` launch button + menu button |
 | `PORT` | optional | Web server port (Railway sets this automatically; defaults to 3000 locally) |
 | `MEMORY_STORE` | optional | Path for persisted per-user chat memory; point at a Railway volume to survive redeploys |
+| `BLOCKLIST_STORE` | optional | Path for the persisted runtime domain blocklist; point at a Railway volume to survive redeploys |
+| `ADMIN_ID` | optional | Telegram user id allowed to run `/block` and `/unblock`. If unset, anyone can manage the blocklist |
 
 ## Architecture
 
@@ -65,6 +67,8 @@ bot.js
 │   ├── quota.js           in-memory daily NewsAPI call counter
 │   ├── memory.js          per-user chat memory (10 exchanges, 60-min idle,
 │   │                      persisted to MEMORY_STORE) for the free-text Q&A
+│   ├── blocklist.js       runtime domain blocklist (defaults + user-added via
+│   │                      /block), persisted to BLOCKLIST_STORE; used by news.js
 │   └── helpers.js         escapeMarkdown, truncate, buildNewsBody, formatNews,
 │                          shouldRespond, cleanMessage
 ├── data/
@@ -104,7 +108,7 @@ bot.js
 
 - **AI is best-effort.** Every Groq-backed feature (summaries, poll, MCQ) has a silent fallback (description / hardcoded poll / hardcoded MCQ) and logs failures via `console.error`. Users always get content.
 - **API budget.** Scheduled posts use ~9 NewsAPI calls/day (1 each) to stay well under the 100/day free-tier cap. The combined query (`fetchCombinedNews`) replaced 3 separate category fetches. Quota is tracked in `quota.js` (in-memory, resets at SGT midnight).
-- **Blocked domains.** `news.js` drops aggregator/redirector domains (biztoc.com, alltoc.com, medium.com) from every result; fetchers request extras and trim so enough clean stories remain.
+- **Blocked domains.** `news.js` drops blocked domains from every result via `blocklist.js` (defaults: biztoc.com, alltoc.com, medium.com; more added at runtime with `/block`). Fetchers request extras and trim so enough clean stories remain. There is no source whitelist — the feed pulls from all of NewsAPI minus the blocklist.
 - **PDFKit only supports JPEG/PNG.** Other image formats fall back to a navy "NOMO NEWS" placeholder. (Telegram itself handles WebP, so the carousel shows more real photos than the PDF.)
 - **Times are always Asia/Singapore** via the `TZ` constant and `cron` `{ timezone: TZ }`.
 

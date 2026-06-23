@@ -19,6 +19,10 @@
 | `/news` | Open the fullscreen news reader (Mini App; requires `WEBAPP_URL`). `/swipe` also works |
 | `/reset` | Clear your conversation memory with the bot (start a fresh thread) |
 | `/quota` | Check NewsAPI usage today (100/day limit) |
+| `/blocked` | List domains currently filtered out of the news |
+| `/block <domain>` | Block a domain from the news (admin) — e.g. `/block junk.com` |
+| `/unblock <domain>` | Remove a domain from the blocklist (admin) |
+| `/myid` | Show your Telegram user ID (used to set `ADMIN_ID`) |
 | `/testpdf` | Generate a test PDF magazine |
 | `/schedule` | View the daily posting schedule |
 

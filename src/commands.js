@@ -4,9 +4,10 @@ const { askGroq, chatGroq } = require('./groq');
 const { generateNewsPDF } = require('./pdf');
 const { formatNews, shouldRespond, cleanMessage, truncate } = require('./helpers');
 const { DAILY_LIMIT, getQuota } = require('./quota');
-const { BOT_USERNAME } = require('../config');
+const { BOT_USERNAME, ADMIN_ID } = require('../config');
 const { scheduleText, mainKeyboard } = require('./scheduler');
 const memory = require('./memory');
+const blocklist = require('./blocklist');
 
 function registerCommands(bot) {
   bot.onText(/\/start/, (msg) => {
@@ -175,6 +176,37 @@ function registerCommands(bot) {
   bot.onText(/\/reset/, (msg) => {
     memory.reset(msg.chat.id, msg.from && msg.from.id);
     bot.sendMessage(msg.chat.id, '🧹 Memory cleared — starting fresh.');
+  });
+
+  // ─── Blocklist management ───────────────────────────────────────
+  // If ADMIN_ID is set, only that user can block/unblock; otherwise open.
+  const canManage = (msg) => !ADMIN_ID || String(msg.from && msg.from.id) === String(ADMIN_ID);
+
+  bot.onText(/^\/myid(?:@\w+)?$/, (msg) => {
+    bot.sendMessage(msg.chat.id, `Your Telegram ID: \`${msg.from && msg.from.id}\``, { parse_mode: 'Markdown' });
+  });
+
+  bot.onText(/^\/blocked(?:@\w+)?$/, (msg) => {
+    const list = blocklist.list();
+    bot.sendMessage(msg.chat.id, `🚫 *Blocked domains* (${list.length})\n\n` + list.map(d => `• ${d}`).join('\n'), { parse_mode: 'Markdown' });
+  });
+
+  bot.onText(/^\/block(?:@\w+)?(?:\s+(.+))?$/, (msg, match) => {
+    if (!canManage(msg)) return bot.sendMessage(msg.chat.id, '⛔ Only the admin can manage the blocklist.');
+    const arg = match[1] && match[1].trim();
+    if (!arg) return bot.sendMessage(msg.chat.id, 'Usage: `/block example.com`', { parse_mode: 'Markdown' });
+    const d = blocklist.add(arg);
+    const note = ADMIN_ID ? '' : '\n\n_Tip: set ADMIN_ID (see /myid) so only you can edit this._';
+    bot.sendMessage(msg.chat.id, `🚫 Blocked *${d}* — it won't appear in future news.${note}`, { parse_mode: 'Markdown' });
+  });
+
+  bot.onText(/^\/unblock(?:@\w+)?(?:\s+(.+))?$/, (msg, match) => {
+    if (!canManage(msg)) return bot.sendMessage(msg.chat.id, '⛔ Only the admin can manage the blocklist.');
+    const arg = match[1] && match[1].trim();
+    if (!arg) return bot.sendMessage(msg.chat.id, 'Usage: `/unblock example.com`', { parse_mode: 'Markdown' });
+    const d = blocklist.remove(arg);
+    if (d) bot.sendMessage(msg.chat.id, `✅ Unblocked *${d}*.`, { parse_mode: 'Markdown' });
+    else bot.sendMessage(msg.chat.id, `Couldn't unblock that — it's either not on the list or a built-in default.`);
   });
 
   bot.on('message', async (msg) => {

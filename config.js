@@ -7,6 +7,7 @@ const NEWS_API_KEY = process.env.NEWS_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const WEBAPP_URL = process.env.WEBAPP_URL;
+const ADMIN_ID = process.env.ADMIN_ID;
 
 // Fail fast with a clear message if anything required is missing, instead of
 // crashing later with a cryptic error mid-request.
@@ -36,4 +37,4 @@ if (missingRequired.length) {
   process.exit(1);
 }
 
-module.exports = { TZ, BOT_USERNAME, CHAT_ID, NEWS_API_KEY, GROQ_API_KEY, TELEGRAM_TOKEN, WEBAPP_URL };
+module.exports = { TZ, BOT_USERNAME, CHAT_ID, NEWS_API_KEY, GROQ_API_KEY, TELEGRAM_TOKEN, WEBAPP_URL, ADMIN_ID };

@@ -1,28 +1,12 @@
 const axios = require('axios');
 const { NEWS_API_KEY } = require('../config');
 const { trackApiCall } = require('./quota');
+const { isBlocked } = require('./blocklist');
 
-// Low-quality aggregators / redirectors to drop from every result. biztoc.com
-// in particular redirects to alltoc.com instead of the real source article.
-const BLOCKED_DOMAINS = [
-  'biztoc.com',   // scraper aggregator, redirects to alltoc.com
-  'alltoc.com',   // redirect aggregator
-  'medium.com',   // blog platform, inconsistent quality
-];
-
-function isCleanArticle(article) {
-  if (!article || !article.url) return false;
-  try {
-    const host = new URL(article.url).hostname;
-    return !BLOCKED_DOMAINS.some(d => host.includes(d));
-  } catch {
-    return false;
-  }
-}
-
-// Removes blocked-domain articles from a NewsAPI response.
+// Removes blocked-domain articles from a NewsAPI response. The blocklist is
+// managed at runtime via /block and /unblock (see blocklist.js).
 function filterArticles(articles) {
-  return (articles || []).filter(isCleanArticle);
+  return (articles || []).filter(a => a && a.url && !isBlocked(a.url));
 }
 
 async function fetchNews(category, pageSize = 10) {
