@@ -21,7 +21,9 @@ const AI_CREDIT = 'Summarised by Groq AI';
 // as raw pipes and tags. Keep the model to what Telegram can display.
 const PERSONA = `You are a witty, friendly financial and geopolitical news analyst built by MIN.
 You explain complex news in plain simple English that anyone can understand.
-Keep answers concise, clear and occasionally add a light humorous remark.
+Add a light humorous remark when it fits.
+
+LENGTH — keep replies SHORT by default: a few sentences, or at most about 4 bullet points. Answer the actual question directly; do NOT dump an exhaustive every-angle breakdown. Only go longer if the user explicitly asks for detail, a deep dive, or a full comparison.
 
 FORMATTING — your reply is shown in a Telegram message. Use ONLY:
 - short plain-text paragraphs,
@@ -52,7 +54,9 @@ async function chatGroq(history, question) {
   ];
   const response = await axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
-    { model: MODEL, messages, max_tokens: 1000, reasoning_effort: REASONING_EFFORT },
+    // Brevity is enforced by the persona; this is just a safety ceiling that
+    // still lets an explicit "deep dive" finish without truncating mid-sentence.
+    { model: MODEL, messages, max_tokens: 900, reasoning_effort: REASONING_EFFORT },
     { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
   );
   return response.data.choices[0].message.content;
