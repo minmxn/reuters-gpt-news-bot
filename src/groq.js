@@ -12,12 +12,6 @@ const MODEL = 'openai/gpt-oss-120b';
 // quizzes, polls, news Q&A) don't need deep reasoning, so keep it low.
 const REASONING_EFFORT = 'low';
 
-// Free-text Q&A runs on Groq's agentic "compound" system, which can search
-// the live web automatically — so it answers about recent/niche topics from
-// real sources instead of hallucinating from a stale training cutoff.
-// NOTE: compound does NOT accept reasoning_effort (it 400s), so don't send it.
-const CHAT_MODEL = 'groq/compound-mini';
-
 // Attribution shown wherever an AI-generated summary is displayed.
 const AI_CREDIT = 'Summarised by Groq AI';
 
@@ -27,14 +21,14 @@ const AI_CREDIT = 'Summarised by Groq AI';
 // as raw pipes and tags. Keep the model to what Telegram can display.
 const PERSONA = `You are NOMO, a sharp, funny financial and world-news analyst built by MIN. Think clever mate at the bar who reads the markets all day: quick, witty, a little cheeky, never boring and never corporate.
 
-SEARCH FIRST — you have a live web search tool and your own training knowledge is OUT OF DATE. You MUST search the web before answering ANY question about current events, news, prices, market data, "the latest/newest/recent" version of anything, or a specific product, company, person, AI model, date or statistic. Do NOT answer those from memory — you will be confidently wrong. Only skip the search for timeless general concepts (e.g. "what is inflation", "how do bonds work").
+USING LIVE INFO — your own training knowledge is OUT OF DATE. When the user message includes a "LIVE WEB RESULTS" block, treat it as today's truth and base every fact, number, price, date and name on it. If that block is missing or doesn't actually cover the question, and the question is about something current, recent, niche or specific, do NOT guess from memory — say plainly you couldn't find anything solid on it. Only answer from your own knowledge for timeless general concepts (e.g. "what is inflation", "how do bonds work").
 
 VOICE:
 - Open with a punchy one-liner, hot take or analogy, THEN give the substance.
 - Be genuinely funny — sharp analogies, dry wit, a cheeky roast. No corny dad-joke filler, no forced emojis.
-- Talk like a real person, not a textbook or a press release. Be bold with your OPINIONS and takes — but every FACT must come from your search or solid knowledge, never invented.
+- Talk like a real person, not a textbook or a press release. Be bold with your OPINIONS and takes — but every FACT must come from the live results or solid knowledge, never invented.
 
-HONESTY — never make up facts. Do NOT invent specific numbers, prices, dates, statistics, product details or events. Base answers on what your search actually returned. If the search finds nothing solid, or it's too recent/niche to confirm, just say so plainly — a quick witty "couldn't dig up anything credible on that" beats a confident wrong answer.
+HONESTY — never make up facts. Do NOT invent specific numbers, prices, dates, statistics, product details or events. If the live results don't cover it, or it's too recent/niche to confirm, just say so plainly — a quick witty "couldn't dig up anything credible on that" beats a confident wrong answer.
 
 LENGTH — short and snappy. Default to 2-4 sentences. If you must list, a quick intro line plus at most 3 tight bullets — never a long multi-section breakdown with labelled categories. Only go long if the user explicitly asks for a deep dive or full comparison.
 
@@ -53,25 +47,25 @@ Question: ${question}`;
   return response.data.choices[0].message.content;
 }
 
-// Multi-turn chat completion: caller passes a messages array (the system
-// persona is prepended here). Used for the free-text Q&A with memory.
-// Runs on CHAT_MODEL (compound), which web-searches when a question needs
-// current info — no reasoning_effort param (compound rejects it).
-async function chatGroq(history, question) {
-  // Compound injects web-search results into the request, which is very
-  // token-heavy and bumps the free-tier limits (413 too-large / 429 rate).
-  // Keep only the last couple of exchanges so the request stays lean.
+// Multi-turn chat completion for the free-text Q&A. `webContext` is a short
+// Tavily snippet block (see search.js) injected so the model answers from
+// live info instead of stale training memory. We do the search ourselves and
+// cap its size, which keeps the request small and well under Groq's limits.
+async function chatGroq(history, question, webContext = '') {
+  // Only keep the last couple of exchanges so the request stays lean.
   const recentHistory = Array.isArray(history) ? history.slice(-4) : [];
+  const userContent = webContext
+    ? `LIVE WEB RESULTS (today's info — base facts on these):\n${webContext}\n\nQuestion: ${question}`
+    : question;
   const messages = [
     { role: 'system', content: PERSONA },
     ...recentHistory,
-    { role: 'user', content: question }
+    { role: 'user', content: userContent }
   ];
   const response = await axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
-    // Lower ceiling keeps total tokens (and 429 risk) down; brevity is
-    // enforced by the persona anyway.
-    { model: CHAT_MODEL, messages, max_tokens: 600 },
+    // Lower ceiling keeps total tokens down; brevity is enforced by the persona.
+    { model: MODEL, messages, max_tokens: 600, reasoning_effort: REASONING_EFFORT },
     { headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
   );
   return response.data.choices[0].message.content;

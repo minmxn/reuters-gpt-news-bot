@@ -1,6 +1,7 @@
 const fs = require('fs');
 const { fetchNews, fetchNewsByKeyword, fetchNewsByCountry, fetchCombinedNews } = require('./news');
 const { askGroq, chatGroq } = require('./groq');
+const { webSearchContext } = require('./search');
 const { generateNewsPDF } = require('./pdf');
 const { formatNews, shouldRespond, cleanMessage, truncate, sanitizeForTelegram } = require('./helpers');
 const { DAILY_LIMIT, getQuota } = require('./quota');
@@ -231,7 +232,11 @@ function registerCommands(bot) {
     bot.sendChatAction(chatId, 'typing').catch(() => {});
     try {
       const history = memory.getHistory(chatId, userId);
-      const answer = await chatGroq(history, prompt);
+      // Fetch a few short live web snippets so the answer is grounded in
+      // current info instead of the model's stale training (returns '' if
+      // Tavily isn't configured or finds nothing — degrades gracefully).
+      const webContext = await webSearchContext(question);
+      const answer = await chatGroq(history, prompt, webContext);
       // Strip GFM (tables/headings/<br>) Telegram can't render, then try
       // Markdown — and fall back to plain text if it still won't parse, so
       // the send never fails silently.

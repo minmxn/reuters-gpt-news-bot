@@ -8,6 +8,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const WEBAPP_URL = process.env.WEBAPP_URL;
 const ADMIN_ID = process.env.ADMIN_ID;
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 
 // Fail fast with a clear message if anything required is missing, instead of
 // crashing later with a cryptic error mid-request.
@@ -20,6 +21,7 @@ const REQUIRED = {
 const RECOMMENDED = {
   GROQ_API_KEY: 'Groq API key — without it AI briefings, summaries, polls and quizzes are skipped.',
   CHAT_ID: 'Target chat/channel id — without it scheduled posts have nowhere to go.',
+  TAVILY_API_KEY: 'Tavily search key — without it the free-text Q&A can\'t fetch live web info and will only answer from (stale) model knowledge.',
 };
 
 const missingRequired = Object.keys(REQUIRED).filter(k => !process.env[k]);
@@ -37,4 +39,4 @@ if (missingRequired.length) {
   process.exit(1);
 }
 
-module.exports = { TZ, BOT_USERNAME, CHAT_ID, NEWS_API_KEY, GROQ_API_KEY, TELEGRAM_TOKEN, WEBAPP_URL, ADMIN_ID };
+module.exports = { TZ, BOT_USERNAME, CHAT_ID, NEWS_API_KEY, GROQ_API_KEY, TELEGRAM_TOKEN, WEBAPP_URL, ADMIN_ID, TAVILY_API_KEY };

@@ -31,6 +31,7 @@ Validated at startup in [config.js](config.js) — the process exits with a clea
 | `TELEGRAM_TOKEN` | ✅ | Bot token from @BotFather |
 | `NEWS_API_KEY` | ✅ | newsapi.org key |
 | `GROQ_API_KEY` | recommended | AI features; degrade gracefully if absent |
+| `TAVILY_API_KEY` | recommended | Tavily (tavily.com) web-search key. Powers the live-web grounding for the free-text Q&A so it answers current questions from real sources instead of stale model memory. Without it the Q&A still works but only from the model's training (and says "can't confirm" on recent topics). Free tier ~1,000 searches/mo |
 | `CHAT_ID` | recommended | Target chat/channel for scheduled posts |
 | `BOT_USERNAME` | optional | Defaults to `nomogh_bot` (used for group mention/reply detection) |
 | `READER_STORE` | optional | Path for persisted reader sessions; point at a Railway volume (e.g. `/data/reader-sessions.json`) to survive redeploys |
@@ -62,8 +63,11 @@ bot.js
 │   │                      headline card with a button that opens the reader
 │   │                      (web_app button in private chats, link button in groups)
 │   ├── news.js            NewsAPI fetchers + blocked-domain filtering
-│   ├── groq.js            askGroq + generateSummaries / generateMCQSet /
-│   │                      generatePoll (JSON mode, with timeout)
+│   ├── search.js          webSearchContext() — Tavily web search returning a
+│   │                      short, token-capped snippet block to ground the Q&A
+│   ├── groq.js            askGroq + chatGroq (free-text Q&A, takes web context)
+│   │                      + generateSummaries / generateMCQSet / generatePoll
+│   │                      (JSON mode, with timeout); MODEL = openai/gpt-oss-120b
 │   ├── pdf.js             generateNewsPDF() — magazine PDF (cover + stories)
 │   ├── quota.js           in-memory daily NewsAPI call counter
 │   ├── memory.js          per-user chat memory (10 exchanges, 60-min idle,
@@ -87,7 +91,7 @@ bot.js
 
 ### Key registrars
 
-- **commands.js** — `/start`, `/markets`, `/world`, `/tech`, `/briefing`, `/mood`, `/search`, `/stock`, `/sg`, `/us`, `/cn`, `/quota`, `/reset`, `/testpdf`, `/schedule`, the blocklist commands (`/block`, `/unblock`, `/blocked`, `/myid`), plus reply-keyboard buttons and an AI fallback for free-text questions. The free-text Q&A uses `chatGroq` with per-user memory ([memory.js](src/memory.js)) and reply-context (anchors to the message a user replied to). `/read` is registered in reader.js and `/news` (Mini App launch) in bot.js. See [COMMANDS.md](COMMANDS.md).
+- **commands.js** — `/start`, `/markets`, `/world`, `/tech`, `/briefing`, `/mood`, `/search`, `/stock`, `/sg`, `/us`, `/cn`, `/quota`, `/reset`, `/testpdf`, `/schedule`, the blocklist commands (`/block`, `/unblock`, `/blocked`, `/myid`), plus reply-keyboard buttons and an AI fallback for free-text questions. The free-text Q&A uses `chatGroq` with per-user memory ([memory.js](src/memory.js)), reply-context (anchors to the message a user replied to), and a live web-search grounding step ([search.js](src/search.js) via Tavily) so it answers current questions from real sources instead of fabricating. The persona ("NOMO") is punchy/short and only states facts from the web results or admits it can't confirm. `/read` is registered in reader.js and `/news` (Mini App launch) in bot.js. See [COMMANDS.md](COMMANDS.md).
 - **scheduler.js** — cron jobs (see schedule below). `postNewsUpdate()` posts the carousel; `fallbackMCQSet()` rotates hardcoded questions when Groq is unavailable.
 - **reader.js** — the carousel. Sessions (articles + summaries + cached Telegram `file_id`s) live in a `Map`, persisted to `READER_STORE` (24h TTL). Images are pre-downloaded so `Next`/`Prev` (via `editMessageMedia`) are fast; cached `file_id`s make repeat views instant. Image source order: cached file_id → buffer → URL → placeholder.
 
