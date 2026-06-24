@@ -43,13 +43,19 @@ async function fetchNewsByCountry(country, pageSize = 5) {
 // Fetches extra so enough remain after blocked-domain filtering.
 // sortBy: 'popularity' (default — lead with significant stories from major
 // outlets) or 'publishedAt' (newest first, used by the timed news updates).
-async function fetchCombinedNews(pageSize = 15, sortBy = 'popularity') {
+// fromDaysAgo constrains results to a recent window. This matters: without a
+// date filter, sortBy=popularity ranks across NewsAPI's whole ~month window
+// and returns the SAME most-popular articles every day (the feed never moves).
+// A sliding recent window keeps the content fresh day to day.
+async function fetchCombinedNews(pageSize = 15, sortBy = 'popularity', fromDaysAgo = 2) {
   trackApiCall();
+  const from = new Date(Date.now() - fromDaysAgo * 86400000).toISOString().slice(0, 10);
   const response = await axios.get('https://newsapi.org/v2/everything', {
     params: {
       q: 'stock market OR geopolitics OR artificial intelligence OR economy',
       language: 'en',
       sortBy,
+      from,
       pageSize: Math.min(pageSize + 10, 100),
       apiKey: NEWS_API_KEY
     }
