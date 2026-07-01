@@ -231,12 +231,15 @@ function registerCommands(bot) {
       : question;
 
     // Telegram's typing indicator only lasts ~5s, but a Tavily + Groq round
-    // trip can take longer, so re-send it every 4s until we reply — the
-    // "typing…" stays visible for the whole wait. Cleared in finally.
+    // trip can take longer, so re-send it every 4s until the answer is ready.
+    // Stop the timer the instant generation finishes and BEFORE sending the
+    // reply — otherwise a stray typing ping can land at Telegram just after
+    // the message and re-trigger "typing…" for ~5s (the lingering bug).
     bot.sendChatAction(chatId, 'typing').catch(() => {});
     const typingTimer = setInterval(() => {
       bot.sendChatAction(chatId, 'typing').catch(() => {});
     }, 4000);
+    const stopTyping = () => clearInterval(typingTimer);
     try {
       const history = memory.getHistory(chatId, userId);
       // Fetch a few short live web snippets so the answer is grounded in
@@ -244,6 +247,7 @@ function registerCommands(bot) {
       // Tavily isn't configured or finds nothing — degrades gracefully).
       const webContext = await webSearchContext(question);
       const answer = await chatGroq(history, prompt, webContext);
+      stopTyping(); // generation done — stop before sending so no ping lingers
       // Strip GFM (tables/headings/<br>) Telegram can't render, then try
       // Markdown — and fall back to plain text if it still won't parse, so
       // the send never fails silently.
@@ -257,6 +261,7 @@ function registerCommands(bot) {
       }
       memory.append(chatId, userId, question, answer);
     } catch (err) {
+      stopTyping(); // stop before the error reply too
       // Map the noisy Groq/HTTP errors to friendly, in-character replies.
       const status = err.response && err.response.status;
       let reply;
@@ -270,7 +275,7 @@ function registerCommands(bot) {
       console.error('Free-text Q&A error:', status || '', err.message);
       bot.sendMessage(chatId, reply);
     } finally {
-      clearInterval(typingTimer);
+      stopTyping(); // safety net — idempotent
     }
   });
 }
