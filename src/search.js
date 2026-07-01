@@ -56,11 +56,11 @@ async function runSearch(query, searchDepth, timeRange, topic, financeOnly) {
     const text = (r.content && r.content.length > 80 ? r.content : r.raw_content) || r.content || '';
     const snippet = String(text).replace(/\s+/g, ' ').trim().slice(0, SNIPPET_CHARS);
     if (!snippet) continue;
-    // Prefix each result with a ready-made Markdown link to its source, so
+    // Begin each result with a ready-made Markdown link to its source, so
     // the model can attribute facts with a tappable "[Yahoo Finance](url)"
     // link — reusing this exact string avoids mangled or bare URLs.
     const link = `[${sourceName(r.url)}](${r.url})`;
-    lines.push(`• source=${link} — ${r.title} — ${snippet}`);
+    lines.push(`• ${link} — ${r.title} — ${snippet}`);
   }
   return lines.join('\n');
 }
