@@ -21,7 +21,7 @@ if (WEBAPP_URL) {
   bot.setChatMenuButton({ menu_button: { type: 'web_app', text: '📰 News', web_app: { url: WEBAPP_URL } } })
     .catch(err => console.error('setChatMenuButton failed:', err.message));
 
-  bot.onText(/\/news|\/swipe/, (msg) => {
+  bot.onText(/^\/news(?:@\w+)?$|^\/swipe(?:@\w+)?$/, (msg) => {
     if (msg.chat.type !== 'private') {
       bot.sendMessage(msg.chat.id, "📰 Open today's news reader from a *private* chat with me — tap the ☰ button next to the message box.", { parse_mode: 'Markdown' });
       return;

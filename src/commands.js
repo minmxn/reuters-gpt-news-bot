@@ -22,11 +22,11 @@ function registerCommands(bot) {
     );
   });
 
-  bot.onText(/\/schedule|📅 Schedule/, (msg) => {
+  bot.onText(/^\/schedule(?:@\w+)?$|^📅 Schedule$/, (msg) => {
     bot.sendMessage(msg.chat.id, scheduleText, { parse_mode: 'Markdown' });
   });
 
-  bot.onText(/\/markets|📈 Markets/, async (msg) => {
+  bot.onText(/^\/markets(?:@\w+)?$|^📈 Markets$/, async (msg) => {
     bot.sendMessage(msg.chat.id, '📈 Pulling the latest market news...');
     try {
       const articles = await fetchNews('markets');
@@ -36,7 +36,7 @@ function registerCommands(bot) {
     }
   });
 
-  bot.onText(/\/world|🌍 World/, async (msg) => {
+  bot.onText(/^\/world(?:@\w+)?$|^🌍 World$/, async (msg) => {
     bot.sendMessage(msg.chat.id, '🌍 Fetching the latest world and geopolitics news...');
     try {
       const articles = await fetchNews('world');
@@ -46,7 +46,7 @@ function registerCommands(bot) {
     }
   });
 
-  bot.onText(/\/tech|💻 Tech/, async (msg) => {
+  bot.onText(/^\/tech(?:@\w+)?$|^💻 Tech$/, async (msg) => {
     bot.sendMessage(msg.chat.id, '💻 Getting the latest tech news...');
     try {
       const articles = await fetchNews('technology');
@@ -56,7 +56,7 @@ function registerCommands(bot) {
     }
   });
 
-  bot.onText(/\/briefing|☀️ Briefing/, async (msg) => {
+  bot.onText(/^\/briefing(?:@\w+)?$|^☀️ Briefing$/, async (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(chatId, '☀️ Hang tight — putting together your briefing...');
     try {
@@ -69,7 +69,7 @@ function registerCommands(bot) {
     }
   });
 
-  bot.onText(/\/mood|😎 Mood/, async (msg) => {
+  bot.onText(/^\/mood(?:@\w+)?$|^😎 Mood$/, async (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(chatId, '😎 Checking the market mood today...');
     try {
@@ -82,7 +82,7 @@ function registerCommands(bot) {
     }
   });
 
-  bot.onText(/🔍 Search/, (msg) => {
+  bot.onText(/^🔍 Search$/, (msg) => {
     bot.sendMessage(msg.chat.id, '🔍 Type /search followed by any topic!\n\nExamples:\n/search Bitcoin\n/search Nvidia earnings\n/search Singapore economy\n/search Fed rate cut');
   });
 
@@ -98,7 +98,7 @@ function registerCommands(bot) {
     }
   });
 
-  bot.onText(/📊 Stock/, (msg) => {
+  bot.onText(/^📊 Stock$/, (msg) => {
     bot.sendMessage(msg.chat.id, '📊 Type /stock followed by a ticker!\n\nExamples:\n/stock NVDA\n/stock AAPL\n/stock TSLA\n/stock META');
   });
 
@@ -114,7 +114,7 @@ function registerCommands(bot) {
     }
   });
 
-  bot.onText(/\/sg|🌏 Singapore/, async (msg) => {
+  bot.onText(/^\/sg(?:@\w+)?$|^🌏 Singapore$/, async (msg) => {
     bot.sendMessage(msg.chat.id, '🌏 Fetching Singapore news...');
     try {
       const articles = await fetchNewsByCountry('sg');
@@ -124,7 +124,7 @@ function registerCommands(bot) {
     }
   });
 
-  bot.onText(/\/us|🇺🇸 US/, async (msg) => {
+  bot.onText(/^\/us(?:@\w+)?$|^🇺🇸 US$/, async (msg) => {
     bot.sendMessage(msg.chat.id, '🇺🇸 Fetching US news...');
     try {
       const articles = await fetchNewsByCountry('us');
@@ -134,7 +134,7 @@ function registerCommands(bot) {
     }
   });
 
-  bot.onText(/\/cn|🇨🇳 China/, async (msg) => {
+  bot.onText(/^\/cn(?:@\w+)?$|^🇨🇳 China$/, async (msg) => {
     bot.sendMessage(msg.chat.id, '🇨🇳 Fetching China news...');
     try {
       const articles = await fetchNewsByCountry('cn');

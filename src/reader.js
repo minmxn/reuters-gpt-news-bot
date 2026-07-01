@@ -171,7 +171,7 @@ async function startReader(bot, chatId, opts = {}) {
 
 function registerReader(bot) {
   loadSessions();
-  bot.onText(/\/read|📖 Read/, (msg) => startReader(bot, msg.chat.id));
+  bot.onText(/^\/read(?:@\w+)?$|^📖 Read$/, (msg) => startReader(bot, msg.chat.id));
 
   bot.on('callback_query', async (q) => {
     const data = q.data || '';
