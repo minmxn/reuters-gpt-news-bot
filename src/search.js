@@ -52,17 +52,37 @@ async function runSearch(query, searchDepth, timeRange, topic, financeOnly) {
     const text = (r.content && r.content.length > 80 ? r.content : r.raw_content) || r.content || '';
     const snippet = String(text).replace(/\s+/g, ' ').trim().slice(0, SNIPPET_CHARS);
     if (!snippet) continue;
-    // Prefix each result with its source domain so the model can attribute
-    // facts (e.g. "per Yahoo Finance") instead of vaguely saying "the data".
-    lines.push(`• [${domainOf(r.url)}] ${r.title} — ${snippet}`);
+    // Prefix each result with its friendly source name so the model can
+    // attribute facts (e.g. "per Yahoo Finance") instead of vaguely saying
+    // "the data" — and without pasting a bare URL Telegram would auto-link.
+    lines.push(`• [${sourceName(r.url)}] ${r.title} — ${snippet}`);
   }
   return lines.join('\n');
 }
 
-// Extracts a readable source name from a URL (e.g. "finance.yahoo.com").
-function domainOf(url) {
-  try { return new URL(url).hostname.replace(/^www\./, ''); }
-  catch { return 'source'; }
+// Friendly display names for common sources, so the model cites "Yahoo
+// Finance" rather than the bare "finance.yahoo.com" (which Telegram would
+// auto-link into an ugly/broken URL).
+const SOURCE_NAMES = {
+  'finance.yahoo.com': 'Yahoo Finance',
+  'stockanalysis.com': 'StockAnalysis',
+  'marketwatch.com': 'MarketWatch',
+  'cnbc.com': 'CNBC',
+  'reuters.com': 'Reuters',
+  'bloomberg.com': 'Bloomberg',
+  'investing.com': 'Investing.com',
+  'google.com': 'Google Finance',
+};
+
+// Turns a URL into a clean, human-readable source name (e.g. "Yahoo Finance").
+// Falls back to the domain minus the TLD, title-cased, for unknown sites.
+function sourceName(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    if (SOURCE_NAMES[host]) return SOURCE_NAMES[host];
+    const base = host.split('.').slice(-2, -1)[0] || host;
+    return base.charAt(0).toUpperCase() + base.slice(1);
+  } catch { return 'a source'; }
 }
 
 // Ask Groq to plan the search in ONE call: clean up the user's raw question
