@@ -7,8 +7,8 @@ const { TAVILY_API_KEY, GROQ_API_KEY } = require('../config');
 // what lets the free-text Q&A use live info without blowing Groq's token
 // limits (the reason we don't let the model search the web itself).
 
-const MAX_RESULTS = 7;
-const SNIPPET_CHARS = 400;
+const MAX_RESULTS = 10;
+const SNIPPET_CHARS = 600;
 const TIMEOUT_MS = 12000; // advanced search can be slow; give it room
 
 // One Tavily call at the given depth. Returns a context string ('' if empty).
