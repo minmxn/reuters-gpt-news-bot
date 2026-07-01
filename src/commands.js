@@ -230,7 +230,13 @@ function registerCommands(bot) {
       ? `(Replying to: "${truncate(repliedText, 400)}")\n\n${question}`
       : question;
 
+    // Telegram's typing indicator only lasts ~5s, but a Tavily + Groq round
+    // trip can take longer, so re-send it every 4s until we reply — the
+    // "typing…" stays visible for the whole wait. Cleared in finally.
     bot.sendChatAction(chatId, 'typing').catch(() => {});
+    const typingTimer = setInterval(() => {
+      bot.sendChatAction(chatId, 'typing').catch(() => {});
+    }, 4000);
     try {
       const history = memory.getHistory(chatId, userId);
       // Fetch a few short live web snippets so the answer is grounded in
@@ -263,6 +269,8 @@ function registerCommands(bot) {
       }
       console.error('Free-text Q&A error:', status || '', err.message);
       bot.sendMessage(chatId, reply);
+    } finally {
+      clearInterval(typingTimer);
     }
   });
 }
