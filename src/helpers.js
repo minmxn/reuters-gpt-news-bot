@@ -21,7 +21,11 @@ function sanitizeForTelegram(text) {
     // trailing "[Reuters](url)" tag (Claude-style) regardless of how the
     // model phrased it.
     .replace(/(^|[\s(])(?:per|according to)\s+(?=\[[^\]]+\]\([^)]+\))/gi, '$1')
-    .replace(/\bsource\s*=\s*(?=\[[^\]]+\]\([^)]+\))/gi, '');
+    .replace(/\bsource\s*=\s*(?=\[[^\]]+\]\([^)]+\))/gi, '')
+    // When several source tags sit together, separate them with ", " (drop a
+    // joining "and"/"&"/";" so "[Yahoo](u) and [Quiverquant](v)" becomes
+    // "[Yahoo](u), [Quiverquant](v)").
+    .replace(/(\]\([^)]+\))\s*(?:and|&|;|,|\/|·)?\s*(?=\[[^\]]+\]\([^)]+\))/gi, '$1, ');
 
   const out = [];
   for (const line of t.split('\n')) {
