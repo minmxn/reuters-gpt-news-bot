@@ -103,7 +103,7 @@ async function planSearch(rawQuery) {
 1. query — rewrite it into a short, keyword-rich web search query. Fix typos, spell out company/ticker names (e.g. "palantir" → "Palantir PLTR"), and add words that get good results (e.g. "stock price today", "latest news"). No filler words.
 2. time_range — how recent the info needs to be: "day", "week", "month", or "year".
 3. topic — "news" for news/events/announcements, or "general" for prices, data, stats, or factual lookups.
-4. finance — true if the question is about a specific stock/crypto price, quote, or market value; otherwise false.
+4. finance — true ONLY if the user is asking about a price, quote, or how something is trading (e.g. "palantir stock today", "BTC price"). A definitional or general question like "what is Palantir" or "who founded Tesla" is NOT finance — set false.
 
 User message: "${rawQuery}"
 
