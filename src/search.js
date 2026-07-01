@@ -31,11 +31,15 @@ async function runSearch(query, searchDepth, timeRange, topic, financeOnly) {
     query,
     max_results: MAX_RESULTS,
     search_depth: searchDepth,
-    time_range: timeRange,
     include_answer: 'advanced', // Tavily's own synthesis of the results
     include_raw_content: true,  // fuller page text so more numbers survive
     topic,
   };
+  // time_range filters by a page's PUBLISH date. Only apply it when set —
+  // for finance/price queries we pass null, because stock-quote pages are
+  // evergreen URLs (not dated "today"), so a day/week filter would wrongly
+  // exclude them and the search would come back empty.
+  if (timeRange) body.time_range = timeRange;
   if (financeOnly) body.include_domains = FINANCE_DOMAINS;
 
   const resp = await axios.post(
@@ -132,14 +136,15 @@ Respond ONLY with JSON: {"query":"...","time_range":"day|week|month|year","topic
 async function webSearchContext(rawQuery) {
   if (!TAVILY_API_KEY) return '';
   const { query, timeRange, topic, finance } = await planSearch(rawQuery);
-  // For finance questions, try the curated finance sources first, then widen
-  // to the whole web if that comes back empty. Non-finance skips straight to
-  // the open web. Each tier also falls back from advanced→basic depth.
+  // For finance questions, drop the date filter (null) so evergreen stock-
+  // quote pages aren't excluded, try the curated finance sources first, then
+  // widen to the whole web if that comes back empty. Non-finance keeps the
+  // inferred time window. Each tier also falls back from advanced→basic depth.
   const attempts = finance
     ? [
-        ['advanced', timeRange, topic, true],
-        ['advanced', timeRange, topic, false],
-        ['basic', timeRange, topic, false],
+        ['advanced', null, topic, true],
+        ['advanced', null, topic, false],
+        ['basic', null, topic, false],
       ]
     : [
         ['advanced', timeRange, topic, false],
@@ -157,4 +162,4 @@ async function webSearchContext(rawQuery) {
   return '';
 }
 
-module.exports = { webSearchContext };
+module.exports = { webSearchContext, planSearch };
