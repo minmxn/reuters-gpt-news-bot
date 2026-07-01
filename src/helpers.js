@@ -14,7 +14,12 @@ function sanitizeForTelegram(text) {
   if (!text) return '';
   let t = text
     .replace(/\*\*(.+?)\*\*/g, '*$1*')    // **bold** (GFM) → *bold* (Telegram)
-    .replace(/^#{1,6}\s*(.+?)\s*$/gm, '*$1*'); // # Heading → *Heading*
+    .replace(/^#{1,6}\s*(.+?)\s*$/gm, '*$1*') // # Heading → *Heading*
+    // Citation style: strip a connector word ("per"/"according to") when it
+    // sits right before a source link, so "... per [Reuters](url)" becomes a
+    // clean trailing "[Reuters](url)" tag (Claude-style) regardless of how
+    // the model phrased it.
+    .replace(/(^|[\s(])(?:per|according to)\s+(?=\[[^\]]+\]\([^)]+\))/gi, '$1');
 
   const out = [];
   for (const line of t.split('\n')) {
