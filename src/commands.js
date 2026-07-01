@@ -242,10 +242,12 @@ function registerCommands(bot) {
       // Markdown — and fall back to plain text if it still won't parse, so
       // the send never fails silently.
       const clean = sanitizeForTelegram(answer);
+      // disable_web_page_preview stops Telegram from rendering a big image
+      // preview card under source links — we just want the inline link.
       try {
-        await bot.sendMessage(chatId, `🤖 ${clean}`, { parse_mode: 'Markdown' });
+        await bot.sendMessage(chatId, `🤖 ${clean}`, { parse_mode: 'Markdown', disable_web_page_preview: true });
       } catch (sendErr) {
-        await bot.sendMessage(chatId, `🤖 ${clean}`);
+        await bot.sendMessage(chatId, `🤖 ${clean}`, { disable_web_page_preview: true });
       }
       memory.append(chatId, userId, question, answer);
     } catch (err) {
